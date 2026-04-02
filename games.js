@@ -302,20 +302,57 @@ class LoveMemoryGame {
   }
 }
 
-// ========== AMBIENT MUSIC SYSTEM ==========
+// ========== AMBIENT MUSIC SYSTEM WITH REAL AUDIO FILES ==========
 class AmbientMusic {
   constructor() {
     this.isPlaying = false;
     this.volume = 0.3;
-    this.audioContext = null;
-    this.oscillators = [];
-    this.gainNodes = []; // Track gain nodes for real-time volume control
-    this.musicType = 'ambient'; // ambient, piano, nature, custom
+    this.currentAudioType = 'ambient';
+    this.audioElement = null;
+    this.currentUrlIndex = 0;
     
+    // Real audio URLs from royalty-free sources (SoundHelix & Pixabay)
+    this.musicLibrary = {
+      ambient: {
+        name: '🌌 Ambient',
+        urls: [
+          'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
+          'https://cdn.pixabay.com/download/audio/2022/02/15/audio_d1718ab41b.mp3'
+        ]
+      },
+      lofi: {
+        name: '🎹 Lo-Fi',
+        urls: [
+          'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
+          'https://cdn.pixabay.com/download/audio/2021/08/04/audio_8d44427b47.mp3'
+        ]
+      },
+      meditation: {
+        name: '🧘 Meditation',
+        urls: [
+          'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
+          'https://cdn.pixabay.com/download/audio/2021/06/17/audio_99e78da3ff.mp3'
+        ]
+      },
+      nature: {
+        name: '🌿 Nature',
+        urls: [
+          'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
+          'https://cdn.pixabay.com/download/audio/2022/01/20/audio_06cbe7e5f3.mp3'
+        ]
+      }
+    };
+
     this.init();
   }
 
   init() {
+    // Create audio element
+    this.audioElement = new Audio();
+    this.audioElement.crossOrigin = 'anonymous';
+    this.audioElement.loop = true;
+    this.audioElement.volume = this.volume;
+    
     const toggleBtn = document.getElementById('musicToggle');
     const volumeSlider = document.getElementById('musicVolume');
     const volumePercent = document.getElementById('volumePercent');
@@ -328,28 +365,39 @@ class AmbientMusic {
     if(volumeSlider) {
       volumeSlider.addEventListener('input', (e) => {
         this.volume = e.target.value / 100;
+        this.audioElement.volume = this.volume;
         if(volumePercent) volumePercent.textContent = e.target.value + '%';
-        // Update gain nodes in real-time
-        this.gainNodes.forEach(gain => {
-          gain.gain.setValueAtTime(this.volume * 0.1, this.audioContext.currentTime);
-        });
       });
     }
 
     if(musicTypeBtn) {
       musicTypeBtn.addEventListener('click', () => this.nextMusicType());
     }
+
+    // Handle audio errors gracefully
+    this.audioElement.addEventListener('error', (e) => {
+      console.warn('Current audio source failed, trying next...');
+      this.tryNextSource();
+    });
+
+    // Handle when audio is ended
+    this.audioElement.addEventListener('ended', () => {
+      if(this.isPlaying) {
+        this.audioElement.currentTime = 0;
+        this.audioElement.play().catch(e => console.warn('Auto-replay failed'));
+      }
+    });
   }
 
   nextMusicType() {
-    const types = ['ambient', 'piano', 'nature', 'custom'];
-    const currentIndex = types.indexOf(this.musicType);
-    this.musicType = types[(currentIndex + 1) % types.length];
+    const types = ['ambient', 'lofi', 'meditation', 'nature'];
+    const currentIndex = types.indexOf(this.currentAudioType);
+    this.currentAudioType = types[(currentIndex + 1) % types.length];
     
     // If music is playing, stop and restart with new type
     if(this.isPlaying) {
       this.stop();
-      this.play();
+      setTimeout(() => this.play(), 300);
     }
     
     this.updateMusicTypeButton();
@@ -359,13 +407,8 @@ class AmbientMusic {
     const btn = document.getElementById('musicType');
     if(!btn) return;
     
-    const names = {
-      ambient: '🌌 Ambient',
-      piano: '🎹 Piano',
-      nature: '🌿 Nature',
-      custom: '📻 Custom'
-    };
-    btn.textContent = names[this.musicType] || '🎵 Music';
+    const trackInfo = this.musicLibrary[this.currentAudioType];
+    btn.textContent = trackInfo ? trackInfo.name : '🎵 Music';
   }
 
   toggle() {
@@ -377,139 +420,95 @@ class AmbientMusic {
   }
 
   play() {
-    if(!this.audioContext) {
-      this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    try {
+      const trackInfo = this.musicLibrary[this.currentAudioType];
+      
+      if(!trackInfo || !trackInfo.urls || trackInfo.urls.length === 0) {
+        console.error('Music track not found');
+        return;
+      }
+
+      this.currentUrlIndex = 0;
+      this.loadTrack(trackInfo.urls[0]);
+    } catch(e) {
+      console.error('Error playing music:', e);
     }
+  }
 
-    const ctx = this.audioContext;
-    this.gainNodes = []; // Reset gain nodes
-    
-    switch(this.musicType) {
-      case 'piano':
-        this.playPiano(ctx);
-        break;
-      case 'nature':
-        this.playNature(ctx);
-        break;
-      case 'custom':
-        this.playCustom(ctx);
-        break;
-      default:
-        this.playAmbient(ctx);
+  loadTrack(url) {
+    try {
+      this.audioElement.src = url;
+      this.audioElement.volume = this.volume;
+      
+      const playPromise = this.audioElement.play();
+      
+      if(playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            this.isPlaying = true;
+            this.updateToggleButton();
+          })
+          .catch(error => {
+            console.warn('Playback failed for:', url, error);
+            this.tryNextSource();
+          });
+      } else {
+        this.isPlaying = true;
+        this.updateToggleButton();
+      }
+    } catch(e) {
+      console.error('Error loading track:', e);
+      this.tryNextSource();
     }
-    
-    this.isPlaying = true;
-    const toggleBtn = document.getElementById('musicToggle');
-    if(toggleBtn) toggleBtn.textContent = '🎵 Music: ON';
   }
 
-  playAmbient(ctx) {
-    // Create a simple ambient chord progression (C, E, G)
-    const notes = [261.63, 329.63, 392.00];
+  tryNextSource() {
+    const trackInfo = this.musicLibrary[this.currentAudioType];
+    if(!trackInfo || !trackInfo.urls) return;
+
+    this.currentUrlIndex = (this.currentUrlIndex || 0) + 1;
     
-    notes.forEach(freq => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      
-      osc.frequency.value = freq;
-      osc.type = 'sine';
-      gain.gain.setValueAtTime(this.volume * 0.1, ctx.currentTime);
-      
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      
-      this.oscillators.push({ osc, gain });
-      this.gainNodes.push(gain);
-    });
+    if(this.currentUrlIndex < trackInfo.urls.length) {
+      console.log(`Trying alternate source ${this.currentUrlIndex + 1}...`);
+      this.loadTrack(trackInfo.urls[this.currentUrlIndex]);
+    } else {
+      console.error('All audio sources failed');
+      this.showErrorMessage();
+    }
   }
 
-  playPiano(ctx) {
-    // Piano-like chord (C major: C, E, G, C)
-    const pianoNotes = [261.63, 329.63, 392.00, 523.25];
+  showErrorMessage() {
+    const errorMsg = document.createElement('div');
+    errorMsg.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: rgba(220, 38, 38, 0.9);
+      color: white;
+      padding: 15px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      z-index: 1001;
+      animation: slideIn 0.3s ease-out;
+    `;
+    errorMsg.textContent = '⚠️ Unable to load music. Please check your connection.';
+    document.body.appendChild(errorMsg);
     
-    pianoNotes.forEach((freq, index) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      
-      osc.frequency.value = freq;
-      osc.type = 'triangle'; // Triangle for warmer tone
-      
-      // Envelope for piano-like decay
-      gain.gain.setValueAtTime(this.volume * 0.08, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 3);
-      
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      
-      setTimeout(() => osc.start(ctx.currentTime), index * 200);
-      setTimeout(() => osc.stop(ctx.currentTime + 3), index * 200);
-      
-      this.oscillators.push({ osc, gain });
-      this.gainNodes.push(gain);
-    });
-  }
-
-  playNature(ctx) {
-    // Nature sounds - birds chirping simulation (higher frequencies)
-    const birdNotes = [600, 800, 1000, 750, 950];
-    
-    birdNotes.forEach((freq, index) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      
-      osc.frequency.value = freq;
-      osc.type = 'sine';
-      
-      gain.gain.setValueAtTime(this.volume * 0.05, ctx.currentTime + index * 0.5);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + index * 0.5 + 1);
-      
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      
-      setTimeout(() => osc.start(ctx.currentTime), index * 500);
-      setTimeout(() => osc.stop(ctx.currentTime + 1), index * 500);
-      
-      this.oscillators.push({ osc, gain });
-      this.gainNodes.push(gain);
-    });
-  }
-
-  playCustom(ctx) {
-    
-    const baseFreq = 174.61; 
-    const variations = [0, 0.5, 1]; 
-    
-    variations.forEach((variation) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      
-      osc.frequency.value = baseFreq + variation;
-      osc.type = 'sine';
-      gain.gain.setValueAtTime(this.volume * 0.12, ctx.currentTime);
-      
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start();
-      
-      this.oscillators.push({ osc, gain });
-      this.gainNodes.push(gain);
-    });
+    setTimeout(() => errorMsg.remove(), 5000);
   }
 
   stop() {
-    this.oscillators.forEach(({ osc }) => {
-      try {
-        osc.stop();
-      } catch(e) {
-        // Already stopped
-      }
-    });
-    this.oscillators = [];
-    this.gainNodes = [];
+    this.audioElement.pause();
+    this.audioElement.currentTime = 0;
     this.isPlaying = false;
+    this.updateToggleButton();
+  }
+
+  updateToggleButton() {
     const toggleBtn = document.getElementById('musicToggle');
-    if(toggleBtn) toggleBtn.textContent = '🎵 Music: OFF';
+    if(toggleBtn) {
+      toggleBtn.textContent = this.isPlaying ? '🎵 Music: ON' : '🎵 Music: OFF';
+    }
   }
 }
 
@@ -534,6 +533,11 @@ style.textContent = `
     100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
   }
 
+  @keyframes slideIn {
+    0% { transform: translateX(400px); opacity: 0; }
+    100% { transform: translateX(0); opacity: 1; }
+  }
+
   .memory-card {
     background: rgba(46, 25, 65, 0.75);
     border: 2px solid rgba(168, 85, 247, 0.5);
@@ -546,6 +550,7 @@ style.textContent = `
     cursor: pointer;
     transition: all 0.3s ease;
     user-select: none;
+    aspect-ratio: 1 / 1;
   }
 
   .memory-card:hover {
