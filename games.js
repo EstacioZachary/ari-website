@@ -358,21 +358,15 @@ class AmbientMusic {
         ]
       },
       lofi: {
-        name: '🎹 Lo-Fi',
+        name: '🎹 Lo-Fi Beats',
         urls: [
           './music/Lofi.mp3'
         ]
       },
       meditation: {
-        name: '💕 RomCom',
+        name: '💕 RomCom Vibes',
         urls: [
           './music/Rob Deniel - RomCom (Official Music Video).mp3'
-        ]
-      },
-      nature: {
-        name: '☕ Café Vibes',
-        urls: [
-          './music/cafe.mp3'
         ]
       }
     };
@@ -424,7 +418,7 @@ class AmbientMusic {
   }
 
   nextMusicType() {
-    const types = ['ambient', 'lofi', 'meditation', 'nature'];
+    const types = ['ambient', 'lofi', 'meditation'];
     const currentIndex = types.indexOf(this.currentAudioType);
     this.currentAudioType = types[(currentIndex + 1) % types.length];
     
