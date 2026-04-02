@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Purple Romance · For My Ari</title>
+  <!-- Tailwind + Google Fonts + Font Awesome -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body class="antialiased">
+
+  <!-- Floating petals container - gentle, constant motion -->
+  <div id="petal-field" class="fixed inset-0 pointer-events-none z-0 overflow-hidden"></div>
+
+  <main class="relative z-10 max-w-6xl mx-auto px-4 py-6 md:py-10">
+    
+    <!-- GRAND HEADER with Kuromi icon (VISUAL ONLY, no text) + Ari's name -->
+    <div class="glass-card p-5 md:p-7 text-center mb-8">
+      <div class="flex flex-wrap justify-center items-center gap-6">
+        <!-- Kuromi icon from Icons8 (pure visual, no mention in text) -->
+        <div class="group cursor-pointer">
+          <img src="https://img.icons8.com/doodle/240/kuromi.png" 
+               alt="Kuromi decorative icon" 
+               class="w-24 h-24 md:w-28 md:h-28 object-contain kuromi-visual"
+               onerror="this.src='https://cdn-icons-png.flaticon.com/512/10182/10182274.png'">
+          <div class="text-xs text-purple-300/70 mt-1">💜</div>
+        </div>
+        <div class="text-center md:text-left">
+          <h1 class="text-5xl md:text-7xl font-black bg-gradient-to-r from-fuchsia-300 via-purple-200 to-pink-300 bg-clip-text text-transparent">
+            🌙 For My Ari 🌙
+          </h1>
+          <p class="text-purple-200 text-lg mt-2 font-semibold tracking-wide">purple petals · endless love · forever yours</p>
+        </div>
+        <div class="hidden lg:block">
+          <i class="fas fa-heart text-5xl text-pink-400/70 animate-pulse"></i>
+        </div>
+      </div>
+      <div class="mt-3 text-purple-100/80 text-sm italic">"Every purple flower whispers your name, Ari."</div>
+    </div>
+
+    <!-- ========== ROMANTIC MESSAGES (EDITABLE, WHITE TEXT, ALL FOR ARI) ========== -->
+    <div class="glass-card p-6 md:p-8 mb-8">
+      <div class="flex items-center gap-3 mb-4 flex-wrap">
+        <i class="fas fa-heart text-pink-400 text-2xl"></i>
+        <h2 class="text-2xl md:text-3xl font-bold text-purple-200">💌 My Love Notes for You, Ari</h2>
+        <i class="fas fa-feather-alt text-purple-300 text-xl"></i>
+      </div>
+      <p class="text-purple-100/80 text-sm mb-4">✨ <strong>Click any text & write your own romantic message</strong> — these notes are just for you, Ari ✨</p>
+      <div class="space-y-5">
+        <div class="romantic-note p-4 rounded-xl cursor-text" contenteditable="true" id="loveMsg1">
+          <i class="fas fa-crown text-purple-300 mr-2"></i> 
+          <span class="text-lg font-medium">"Ari, every purple petal carries my heartbeat to you. You are my whole universe, my forever."</span>
+        </div>
+        <div class="romantic-note p-4 rounded-xl cursor-text" contenteditable="true" id="loveMsg2">
+          <i class="fas fa-moon text-fuchsia-300 mr-2"></i> 
+          <span class="text-lg font-medium">"My dearest Ari, you turned my world into a garden of lavender dreams. I love you endlessly."</span>
+        </div>
+        <div class="romantic-note p-4 rounded-xl cursor-text" contenteditable="true" id="loveMsg3">
+          <i class="fas fa-gem text-purple-300 mr-2"></i> 
+          <span class="text-lg font-medium">"Ari, your love is the melody of my soul. Thank you for being my magic, today and always."</span>
+        </div>
+      </div>
+      <div class="flex justify-end mt-3 text-xs text-purple-200/70"><i class="fas fa-pen-fancy mr-1"></i> tap to personalize your vows for Ari</div>
+    </div>
+
+    <!-- ========== INTERACTIVE LOVE ENVELOPES (popup with custom messages for Ari) ========== -->
+    <div class="glass-card p-6 mb-8">
+      <div class="flex justify-between items-center flex-wrap gap-3 mb-5">
+        <h2 class="text-2xl font-bold text-purple-200"><i class="fas fa-envelope-open-text text-purple-300 mr-2"></i> Secret Love Letters for Ari</h2>
+        <!-- Buttons removed as requested - no scatter or clear controls -->
+      </div>
+      
+      <!-- 3 Interactive Envelope Cards (Tailored for Ari) -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="envelope-trigger bg-black/30 backdrop-blur-sm rounded-2xl p-5 text-center border border-purple-500/50 hover:border-fuchsia-400 cursor-pointer transition-all hover:shadow-xl" data-envelope="1">
+          <i class="fas fa-envelope text-5xl text-purple-300 mb-3"></i>
+          <h3 class="font-extrabold text-purple-200 text-xl">💜 Ari's Promise</h3>
+          <p class="text-purple-100/70 text-sm mt-1">Open this romantic letter</p>
+          <div class="mt-2 text-2xl">🌙✨</div>
+        </div>
+        <div class="envelope-trigger bg-black/30 backdrop-blur-sm rounded-2xl p-5 text-center border border-purple-500/50 hover:border-fuchsia-400 cursor-pointer transition-all hover:shadow-xl" data-envelope="2">
+          <i class="fas fa-envelope-open-text text-5xl text-fuchsia-300 mb-3"></i>
+          <h3 class="font-extrabold text-purple-200 text-xl">💜 Eternal Vow</h3>
+          <p class="text-purple-100/70 text-sm mt-1">A secret message just for Ari</p>
+          <div class="mt-2 text-2xl">💌💜</div>
+        </div>
+        <div class="envelope-trigger bg-black/30 backdrop-blur-sm rounded-2xl p-5 text-center border border-purple-500/50 hover:border-fuchsia-400 cursor-pointer transition-all hover:shadow-xl" data-envelope="3">
+          <i class="fas fa-heart text-5xl text-pink-300 mb-3"></i>
+          <h3 class="font-extrabold text-purple-200 text-xl">💜 Purple Daydream</h3>
+          <p class="text-purple-100/70 text-sm mt-1">Click for a sweet love note</p>
+          <div class="mt-2 text-2xl">🌸💕</div>
+        </div>
+      </div>
+      <p class="text-center text-purple-300/60 text-xs mt-5"><i class="fas fa-info-circle"></i> Tap any card → a romantic envelope appears with my message for you, Ari</p>
+    </div>
+    
+    <!-- ========== LAVENDER COUNTER & ROMANTIC QUOTES (Ari focused, no kuromi text) ========== -->
+    <div class="glass-card p-6 flex flex-wrap justify-between items-center gap-4 mb-8">
+      <div class="flex items-center gap-3">
+        <i class="fas fa-flower text-purple-300 text-2xl"></i>
+        <span class="font-bold text-white">Gentle Petals Dancing:</span>
+        <span id="petalCounter" class="text-3xl font-black text-fuchsia-200">0</span>
+      </div>
+      <div class="flex gap-2 items-center">
+        <i class="fas fa-quote-left text-purple-300"></i>
+        <button id="randomQuoteBtn" class="bg-purple-700/40 hover:bg-purple-600 px-4 py-2 rounded-full text-sm transition">New Sweet Quote <i class="fas fa-sync-alt ml-1"></i></button>
+      </div>
+      <div class="text-sm text-purple-200/80 italic max-w-xs" id="dynamicQuoteDisplay">"Ari, you are my purple daydream."</div>
+    </div>
+
+    <!-- Ari's special dedication card -->
+    <div class="flex justify-center text-center">
+      <div class="glass-card p-5 w-full md:w-auto inline-block">
+        <div class="flex items-center justify-center gap-3">
+          <i class="fas fa-star text-yellow-300"></i>
+          <span class="text-purple-100 text-lg font-semibold">✨ For Ari, with all my heart — every flower, every petal, every beat. ✨</span>
+          <i class="fas fa-star text-yellow-300"></i>
+        </div>
+        <div class="text-3xl mt-2">💜🌙💜</div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="relative z-10 text-center py-6 text-purple-300/40 text-sm">
+    <p>💜 endless purple romance · forever yours, Ari 💜</p>
+  </footer>
+
+  <!-- MODAL POPUP ENVELOPE STRUCTURE -->
+  <div id="envelopeModal" class="modal-backdrop">
+    <div class="envelope-card p-6 text-center relative">
+      <i class="fas fa-envelope-open-text text-6xl text-purple-300 mb-3"></i>
+      <h3 class="text-2xl font-bold text-fuchsia-200" id="modalTitle">💜 Love Letter for Ari 💜</h3>
+      <div class="my-5 text-purple-100 text-lg font-medium whitespace-pre-wrap" id="modalMessage">
+        Your secret message appears here...
+      </div>
+      <button class="close-modal mt-3 px-6 py-2 text-white rounded-full flex items-center gap-2 mx-auto"><i class="fas fa-heart"></i> Close & Keep Magic</button>
+      <div class="absolute -top-3 -right-2 text-3xl animate-pulse">💜</div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
