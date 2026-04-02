@@ -349,35 +349,30 @@ class AmbientMusic {
     this.audioElement = null;
     this.currentUrlIndex = 0;
     
-    // **VERIFIED WORKING** royalty-free music URLs
-    // Sources: Incompetech (Kevin MacLeod) - CORS enabled, widely trusted
+    // Local music files hosted in the /music folder
     this.musicLibrary = {
       ambient: {
-        name: '🌌 Ambient',
+        name: '☕ Café Vibes',
         urls: [
-          'https://incompetech.com/music/royalty-free/mp3-preview/Ambient%20Mind%20(preview).mp3',
-          'https://incompetech.com/music/royalty-free/mp3-preview/Ambient%20Harmony%20(preview).mp3'
+          './music/cafe.mp3'
         ]
       },
       lofi: {
         name: '🎹 Lo-Fi',
         urls: [
-          'https://incompetech.com/music/royalty-free/mp3-preview/Chill%20Wave%20(preview).mp3',
-          'https://incompetech.com/music/royalty-free/mp3-preview/Lofi%20Study%20(preview).mp3'
+          './music/Lofi.mp3'
         ]
       },
       meditation: {
-        name: '🧘 Meditation',
+        name: '💕 RomCom',
         urls: [
-          'https://incompetech.com/music/royalty-free/mp3-preview/Peaceful%20Meditation%20(preview).mp3',
-          'https://incompetech.com/music/royalty-free/mp3-preview/Relaxation%20(preview).mp3'
+          './music/Rob Deniel - RomCom (Official Music Video).mp3'
         ]
       },
       nature: {
-        name: '🌿 Nature',
+        name: '☕ Café Vibes',
         urls: [
-          'https://incompetech.com/music/royalty-free/mp3-preview/Forest%20(preview).mp3',
-          'https://incompetech.com/music/royalty-free/mp3-preview/Nature%20Sounds%20(preview).mp3'
+          './music/cafe.mp3'
         ]
       }
     };
