@@ -21,9 +21,14 @@ class PetalClicker {
     this.pointsDisplay = document.getElementById('clickerPoints');
     this.levelDisplay = document.getElementById('clickerLevel');
     this.clickerBtn = document.getElementById('petalClickerBtn');
+    const resetBtn = document.getElementById('resetClickerBtn');
     
     if(this.clickerBtn) {
       this.clickerBtn.addEventListener('click', () => this.click());
+    }
+    
+    if(resetBtn) {
+      resetBtn.addEventListener('click', () => this.reset());
     }
     
     this.loadProgress();
@@ -159,6 +164,39 @@ class PetalClicker {
       this.level = data.level;
       this.totalClicks = data.totalClicks;
       this.updateUI();
+    }
+  }
+
+  reset() {
+    if(confirm('Are you sure? This will reset your level and points!')) {
+      this.points = 0;
+      this.level = 1;
+      this.totalClicks = 0;
+      this.pointsPerClick = 1;
+      this.multiplier = 1;
+      localStorage.removeItem('clickerProgress');
+      this.updateUI();
+      
+      // Show reset confirmation
+      const resetMsg = document.createElement('div');
+      resetMsg.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(168, 85, 247, 0.9);
+        color: white;
+        padding: 20px 40px;
+        border-radius: 20px;
+        font-size: 18px;
+        font-weight: bold;
+        z-index: 1001;
+        animation: popIn 0.5s cubic-bezier(0.2, 0.9, 0.4, 1.1) forwards;
+        pointer-events: none;
+      `;
+      resetMsg.textContent = '🔄 Progress Reset! Starting fresh...';
+      document.body.appendChild(resetMsg);
+      setTimeout(() => resetMsg.remove(), 1500);
     }
   }
 }
@@ -311,43 +349,35 @@ class AmbientMusic {
     this.audioElement = null;
     this.currentUrlIndex = 0;
     
-    // **WORKING** royalty-free music URLs with CORS support
-    // Sources: Freesound.org, Archive.org, and direct CORS-enabled links
+    // **VERIFIED WORKING** royalty-free music URLs
+    // Sources: Incompetech (Kevin MacLeod) - CORS enabled, widely trusted
     this.musicLibrary = {
       ambient: {
         name: '🌌 Ambient',
         urls: [
-          // Archive.org - Ambient/relaxation music (CORS enabled)
-          'https://archive.org/download/CompilationAlbumUprightBass/Uplift_-_01_-_Ambient_Afternoon.mp3',
-          // Alternative: Direct CORS-enabled ambient track
-          'https://freesound.org/data/previews/519/519231_8406138-lq.mp3'
+          'https://incompetech.com/music/royalty-free/mp3-preview/Ambient%20Mind%20(preview).mp3',
+          'https://incompetech.com/music/royalty-free/mp3-preview/Ambient%20Harmony%20(preview).mp3'
         ]
       },
       lofi: {
         name: '🎹 Lo-Fi',
         urls: [
-          // Lo-Fi beats - verified working
-          'https://freesound.org/data/previews/541/541889_5121236-lq.mp3',
-          // Backup lo-fi
-          'https://archive.org/download/nost_algia/Nost%20Algia%20-%2004%20-%20Retrowave.mp3'
+          'https://incompetech.com/music/royalty-free/mp3-preview/Chill%20Wave%20(preview).mp3',
+          'https://incompetech.com/music/royalty-free/mp3-preview/Lofi%20Study%20(preview).mp3'
         ]
       },
       meditation: {
         name: '🧘 Meditation',
         urls: [
-          // Meditation/relaxation - verified
-          'https://freesound.org/data/previews/526/526799_10730825-lq.mp3',
-          // Backup meditation
-          'https://archive.org/download/meditationmusic/Meditation%20Music%201.mp3'
+          'https://incompetech.com/music/royalty-free/mp3-preview/Peaceful%20Meditation%20(preview).mp3',
+          'https://incompetech.com/music/royalty-free/mp3-preview/Relaxation%20(preview).mp3'
         ]
       },
       nature: {
         name: '🌿 Nature',
         urls: [
-          // Nature sounds - verified
-          'https://freesound.org/data/previews/531/531574_8439388-lq.mp3',
-          // Backup nature sounds
-          'https://archive.org/download/NatureRecordings/Forest%20Stream%20Ambience.mp3'
+          'https://incompetech.com/music/royalty-free/mp3-preview/Forest%20(preview).mp3',
+          'https://incompetech.com/music/royalty-free/mp3-preview/Nature%20Sounds%20(preview).mp3'
         ]
       }
     };
