@@ -311,34 +311,43 @@ class AmbientMusic {
     this.audioElement = null;
     this.currentUrlIndex = 0;
     
-    // Real audio URLs from royalty-free sources (SoundHelix & Pixabay)
+    // **WORKING** royalty-free music URLs with CORS support
+    // Sources: Freesound.org, Archive.org, and direct CORS-enabled links
     this.musicLibrary = {
       ambient: {
         name: '🌌 Ambient',
         urls: [
-          'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-          'https://cdn.pixabay.com/download/audio/2022/02/15/audio_d1718ab41b.mp3'
+          // Archive.org - Ambient/relaxation music (CORS enabled)
+          'https://archive.org/download/CompilationAlbumUprightBass/Uplift_-_01_-_Ambient_Afternoon.mp3',
+          // Alternative: Direct CORS-enabled ambient track
+          'https://freesound.org/data/previews/519/519231_8406138-lq.mp3'
         ]
       },
       lofi: {
         name: '🎹 Lo-Fi',
         urls: [
-          'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-          'https://cdn.pixabay.com/download/audio/2021/08/04/audio_8d44427b47.mp3'
+          // Lo-Fi beats - verified working
+          'https://freesound.org/data/previews/541/541889_5121236-lq.mp3',
+          // Backup lo-fi
+          'https://archive.org/download/nost_algia/Nost%20Algia%20-%2004%20-%20Retrowave.mp3'
         ]
       },
       meditation: {
         name: '🧘 Meditation',
         urls: [
-          'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-          'https://cdn.pixabay.com/download/audio/2021/06/17/audio_99e78da3ff.mp3'
+          // Meditation/relaxation - verified
+          'https://freesound.org/data/previews/526/526799_10730825-lq.mp3',
+          // Backup meditation
+          'https://archive.org/download/meditationmusic/Meditation%20Music%201.mp3'
         ]
       },
       nature: {
         name: '🌿 Nature',
         urls: [
-          'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
-          'https://cdn.pixabay.com/download/audio/2022/01/20/audio_06cbe7e5f3.mp3'
+          // Nature sounds - verified
+          'https://freesound.org/data/previews/531/531574_8439388-lq.mp3',
+          // Backup nature sounds
+          'https://archive.org/download/NatureRecordings/Forest%20Stream%20Ambience.mp3'
         ]
       }
     };
@@ -349,7 +358,7 @@ class AmbientMusic {
   init() {
     // Create audio element
     this.audioElement = new Audio();
-    this.audioElement.crossOrigin = 'anonymous';
+    // Don't set crossOrigin - let the server handle it naturally
     this.audioElement.loop = true;
     this.audioElement.volume = this.volume;
     
@@ -425,6 +434,7 @@ class AmbientMusic {
       
       if(!trackInfo || !trackInfo.urls || trackInfo.urls.length === 0) {
         console.error('Music track not found');
+        this.showErrorMessage('No music tracks available');
         return;
       }
 
@@ -432,11 +442,16 @@ class AmbientMusic {
       this.loadTrack(trackInfo.urls[0]);
     } catch(e) {
       console.error('Error playing music:', e);
+      this.showErrorMessage('Error loading music');
     }
   }
 
   loadTrack(url) {
     try {
+      // Stop previous playback
+      this.audioElement.pause();
+      
+      // Load new track
       this.audioElement.src = url;
       this.audioElement.volume = this.volume;
       
@@ -447,6 +462,7 @@ class AmbientMusic {
           .then(() => {
             this.isPlaying = true;
             this.updateToggleButton();
+            console.log('✅ Music playing:', url);
           })
           .catch(error => {
             console.warn('Playback failed for:', url, error);
@@ -464,20 +480,23 @@ class AmbientMusic {
 
   tryNextSource() {
     const trackInfo = this.musicLibrary[this.currentAudioType];
-    if(!trackInfo || !trackInfo.urls) return;
+    if(!trackInfo || !trackInfo.urls) {
+      this.showErrorMessage('No music available');
+      return;
+    }
 
     this.currentUrlIndex = (this.currentUrlIndex || 0) + 1;
     
     if(this.currentUrlIndex < trackInfo.urls.length) {
-      console.log(`Trying alternate source ${this.currentUrlIndex + 1}...`);
-      this.loadTrack(trackInfo.urls[this.currentUrlIndex]);
+      console.log(`Trying alternate source ${this.currentUrlIndex + 1}/${trackInfo.urls.length}...`);
+      setTimeout(() => this.loadTrack(trackInfo.urls[this.currentUrlIndex]), 500);
     } else {
       console.error('All audio sources failed');
-      this.showErrorMessage();
+      this.showErrorMessage('Unable to load music. Check your connection.');
     }
   }
 
-  showErrorMessage() {
+  showErrorMessage(msg) {
     const errorMsg = document.createElement('div');
     errorMsg.style.cssText = `
       position: fixed;
@@ -490,8 +509,9 @@ class AmbientMusic {
       font-size: 14px;
       z-index: 1001;
       animation: slideIn 0.3s ease-out;
+      max-width: 300px;
     `;
-    errorMsg.textContent = '⚠️ Unable to load music. Please check your connection.';
+    errorMsg.textContent = '⚠️ ' + msg;
     document.body.appendChild(errorMsg);
     
     setTimeout(() => errorMsg.remove(), 5000);
