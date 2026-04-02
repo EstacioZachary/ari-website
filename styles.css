@@ -1,4 +1,4 @@
-/* RESET + SMOOTH PERFORMANCE */
+
 * {
   margin: 0;
   padding: 0;
@@ -13,7 +13,7 @@ body {
   overflow-x: hidden;
 }
 
-/* glass card with better readability */
+
 .glass-card {
   background: rgba(46, 25, 65, 0.75);
   backdrop-filter: blur(12px);
@@ -23,7 +23,7 @@ body {
   transition: all 0.35s cubic-bezier(0.2, 0.9, 0.4, 1.1);
 }
 
-/* floating petals - gentle, constant motion, performance optimized */
+
 .petal {
   position: fixed;
   pointer-events: none;
@@ -43,7 +43,7 @@ body {
   100% { transform: translateY(0px) rotate(0deg) scale(1); opacity: 0.5; }
 }
 
-/* romantic note - WHITE TEXT, dark background readability */
+
 .romantic-note {
   background: rgba(25, 12, 40, 0.7);
   border-left: 5px solid #e879f9;
@@ -68,7 +68,7 @@ body {
   color: white;
 }
 
-/* Modal envelope */
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -115,7 +115,7 @@ body {
   transform: scale(1.02);
 }
 
-/* Ari name style */
+
 .ari-glow {
   text-shadow: 0 0 8px #d28eff, 0 0 4px #b77eff;
 }
@@ -133,7 +133,7 @@ body {
   border-radius: 20px;
 }
 
-/* kuromi image style - visual only, no text */
+
 .kuromi-visual {
   filter: drop-shadow(0 8px 16px rgba(0,0,0,0.4));
   transition: transform 0.3s ease;
@@ -143,7 +143,7 @@ body {
   transform: rotate(-3deg) scale(1.02);
 }
 
-/* no buttons container - hidden */
+
 .hidden-buttons {
   display: none;
 }

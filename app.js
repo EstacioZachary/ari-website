@@ -16,7 +16,7 @@
     const randIcon = petalIcons[Math.floor(Math.random() * petalIcons.length)];
     const petal = document.createElement('i');
     petal.className = `${randIcon} petal`;
-    const size = Math.floor(Math.random() * 22) + 18; // 18-40px, slightly smaller for subtlety
+    const size = Math.floor(Math.random() * 22) + 18; 
     petal.style.fontSize = size + 'px';
     const hue = 260 + Math.random() * 35;
     petal.style.color = `hsl(${hue}, 75%, 68%)`;
@@ -26,13 +26,13 @@
     petal.style.zIndex = 5;
     petal.style.willChange = 'transform';
     
-    // Position: either specified or random within viewport
+
     const posX = (x !== null) ? x : Math.random() * window.innerWidth;
     const posY = (y !== null) ? y : Math.random() * window.innerHeight;
     petal.style.left = posX + 'px';
     petal.style.top = posY + 'px';
     
-    // Longer, smoother animation duration (15-22 seconds)
+ 
     const duration = 15 + Math.random() * 10;
     petal.style.animation = `floatPetals ${duration}s ease-in-out infinite`;
     petal.style.transform = `rotate(${Math.random() * 360}deg)`;
@@ -42,7 +42,7 @@
     petalCount++;
     updatePetalUI();
     
-    // Auto-remove after longer period to maintain gentle population (20 seconds)
+
     setTimeout(() => {
       if(petal && petal.parentNode) {
         petal.remove();
@@ -56,19 +56,19 @@
     return petal;
   }
   
-  // Gentle maintenance: keep petal count between 18-30 for smooth performance
+
   function maintainGentlePetals() {
     const targetMin = 20;
     const targetMax = 32;
     
     if (activePetals.length < targetMin) {
-      // Add a few new petals gently
+     
       const toAdd = Math.min(4, targetMin - activePetals.length);
       for (let i = 0; i < toAdd; i++) {
         setTimeout(() => createPetal(), i * 300);
       }
     } else if (activePetals.length > targetMax) {
-      // Remove excess petals gradually (don't sudden clear)
+  
       const toRemove = activePetals.slice(0, activePetals.length - targetMax);
       toRemove.forEach(petal => {
         if(petal && petal.remove) petal.remove();
@@ -80,26 +80,26 @@
     }
   }
   
-  // Initialize gentle, constant petal field (not too many, not too few)
+  
   function initGentlePetals(initialCount = 22) {
     for(let i = 0; i < initialCount; i++) {
       setTimeout(() => createPetal(), i * 150);
     }
   }
   
-  // Start the gentle maintenance interval (every 8 seconds, adjust softly)
+
   setInterval(() => {
     maintainGentlePetals();
   }, 8000);
   
-  // Also add a new petal occasionally to keep freshness (but very subtle)
+
   setInterval(() => {
     if (activePetals.length < 35 && Math.random() > 0.6) {
       createPetal();
     }
   }, 5000);
   
-  // Show a small toast message (without disrupting petals)
+ 
   function showToast(msg, bg = '#a855f7') {
     let toastDiv = document.createElement('div');
     toastDiv.innerText = msg;
@@ -120,19 +120,17 @@
     setTimeout(() => toastDiv.remove(), 2000);
   }
   
-  // Start the gentle floating petals
+ 
   initGentlePetals(24);
   
-  // Romantic quotes focused on Ari (no Kuromi text)
+ 
   const quotes = [
-    "💜 Ari, you are my eternal purple constellation. 💜",
-    "🌙 Every moment with you is a beautiful dream, Ari. 🌙",
-    "🌸 My love for you grows like lavender in moonlight, Ari. 🌸",
-    "✨ Ari, you turned my world into a violet fairytale. ✨",
-    "💕 Forever yours under a purple sky, my dearest Ari. 💕",
-    "🌹 Ari, your love is the sweetest poetry I've ever known. 🌹",
-    "💜 Ari, every flower whispers your name in my heart. 💜",
-    "🌟 You are my magic, my Ari, my everything. 🌟"
+    "💜 You've made me realize that red is not the most vibrant color there is. 💜",
+    "🌙 Every moment with you is worth treasuring. 🌙",
+    "🌸 My love for you continues to bloom and multiply as time passes by. 🌸",
+    "✨ I shall be the red unto your blue. ✨",
+    "💕 I love you because I chose to do so, always remember that. 💕",
+    "🌟 Your radiance knows no bounds. 🌟"
   ];
   const quoteDisplay = document.getElementById('dynamicQuoteDisplay');
   const randomQuoteBtn = document.getElementById('randomQuoteBtn');
@@ -140,28 +138,28 @@
     randomQuoteBtn.addEventListener('click', () => {
       const randomIdx = Math.floor(Math.random() * quotes.length);
       if(quoteDisplay) quoteDisplay.innerText = quotes[randomIdx];
-      // Add just 2-3 gentle petals for feedback (not overwhelming)
+    
       for(let i = 0; i < 2; i++) setTimeout(() => createPetal(), i * 100);
     });
   }
   
-  // ---------- ENVELOPE POPUP SYSTEM (custom romantic messages FOR ARI) ----------
-  // ✨✨ CUSTOMIZABLE MESSAGES: edit these texts to whatever you want for Ari ✨✨
+  // ---------- ENVELOPE POPUP ----------
+
   const envelopeMessages = {
     1: {
-      title: "💜 Ari's Eternal Promise 💜",
-      message: "My beloved Ari, every purple petal carries a piece of my heart to you. You are my today and all of my tomorrows. I love you more than all the flowers in the universe."
+      title: "💜 I 💜",
+      message: "I will not make promises, because I myself know that promises made by man are made to be broken. But I shall do my best to continouosly remind you and make you realize that you matter, you are loved, and you are worth it."
     },
     2: {
-      title: "🌙 Forever Vow for Ari 🌙",
-      message: "To my dearest Ari: under the purple moonlight, I promise to stand by you through every storm and every bloom. You make my world brighter than a thousand violets. I adore you endlessly."
+      title: "🌙 LOVE 🌙",
+      message: "Love shall be my best symbol of appreciation to your whole being, Ari. And be reminded that my love for you is not of my own but from my God aswell. Thus, my love for you is not within the means of emotion, rather a choice and commitment that I'm willing to make 'till the day I die."
     },
     3: {
-      title: "💌 Purple Daydream Letter 💌",
-      message: "My sweet Ari, your love is the melody of my soul. Thank you for being my magic, my peace, and my home. Every flower in this garden blooms for you. Forever yours."
+      title: "💌 YOU 💌",
+      message: "You are a precious person to me. Which is why I shall continue to cherish and take care of you to the utmost best of my ability. I will choose to be with you in moments of joy, and even in moments of sadness. I love you, Ari!"
     }
   };
-  // ========== ✨ YOU CAN EDIT THE ABOVE TEXTS TO ANY ROMANTIC MESSAGE FOR ARI ✨ ==========
+ 
   
   const modal = document.getElementById('envelopeModal');
   const modalTitle = document.getElementById('modalTitle');
@@ -177,7 +175,7 @@
       modalMessage.innerText = "Ari, you are my forever and always. I love you deeply. 💜";
     }
     modal.classList.add('active');
-    // Add a few extra petals when opening envelope (subtle)
+  
     for(let i = 0; i < 3; i++) setTimeout(() => createPetal(), i * 80);
   }
   
@@ -200,7 +198,7 @@
     if(e.target === modal) closeModalFunc();
   });
   
-  // Interactive elements: Kuromi image & hearts add 1-2 petals only (subtle)
+
   const interactiveElements = document.querySelectorAll('.kuromi-visual, .fa-crown, .fa-heart, .fa-flower');
   interactiveElements.forEach(el => {
     el.addEventListener('click', (e) => {
@@ -217,16 +215,9 @@
     });
   });
   
-  // Editable romantic notes feedback
-  const editableDivs = document.querySelectorAll('[contenteditable="true"]');
-  editableDivs.forEach(div => {
-    div.addEventListener('blur', () => {
-      showToast('💕 Your love note is saved in this purple garden, Ari 💕', '#b77eff');
-    });
-  });
+
   
-  // Performance: ensure petal count never gets too high (already handled by maintainGentlePetals)
-  // Additional safety cleanup every 15 seconds
+
   setInterval(() => {
     if(activePetals.length > 45) {
       const toRemove = activePetals.splice(0, activePetals.length - 35);
