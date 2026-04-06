@@ -64,7 +64,7 @@ class PetalClicker {
   }
 
   checkLevelUp() {
-    const neededPoints = this.level * 100;
+    const neededPoints = 100 * Math.pow(2, this.level - 1);
     if(this.points >= neededPoints) {
       this.level++;
       this.pointsPerClick += 1;
@@ -594,11 +594,247 @@ class AmbientMusic {
   }
 }
 
+// ========== RHYTHM CLICKER GAME ==========
+class RhythmClicker {
+  constructor() {
+    this.score = 0;
+    this.combo = 0;
+    this.isActive = false;
+    this.beats = [];
+    this.currentBeatIndex = 0;
+    this.audioElement = null;
+    this.currentTrack = 'ambient';
+    this.clickWindow = 200; // milliseconds
+    this.perfectWindow = 100;
+    
+    this.init();
+  }
+
+  init() {
+    const startBtn = document.getElementById('rhythmStartBtn');
+    if(startBtn) {
+      startBtn.addEventListener('click', () => this.startGame());
+    }
+  }
+
+  startGame() {
+    // Check if music is playing
+    if(!window.ambientMusic || !window.ambientMusic.isPlaying) {
+      this.showMessage('❌ Start the music player first!', 2000);
+      return;
+    }
+
+    this.audioElement = window.ambientMusic.audioElement;
+    this.currentTrack = window.ambientMusic.currentAudioType;
+    
+    if(!this.audioElement) {
+      this.showMessage('❌ Music player not available', 2000);
+      return;
+    }
+
+    this.score = 0;
+    this.combo = 0;
+    this.currentBeatIndex = 0;
+    this.isActive = true;
+    
+    // Generate beats for current track
+    this.beats = getBeatsForTrack(this.currentTrack);
+    
+    this.updateUI();
+    this.showMessage('🎵 Rhythm game started! Click to the beat!', 2000);
+    this.gameLoop();
+  }
+
+  gameLoop() {
+    if(!this.isActive || !this.audioElement) return;
+
+    const currentTime = this.audioElement.currentTime;
+    const container = document.getElementById('beatTargets');
+    
+    if(!container) {
+      requestAnimationFrame(() => this.gameLoop());
+      return;
+    }
+
+    // Remove expired beat targets
+    const beatElements = document.querySelectorAll('.beat-target');
+    beatElements.forEach(el => {
+      const beatTime = parseFloat(el.getAttribute('data-beat-time'));
+      if(currentTime > beatTime + (this.clickWindow / 1000)) {
+        // Beat window passed - miss
+        if(!el.classList.contains('hit')) {
+          this.combo = 0;
+        }
+        el.remove();
+      }
+    });
+
+    // Show upcoming beats
+    for(let i = this.currentBeatIndex; i < this.beats.length && i < this.currentBeatIndex + 5; i++) {
+      const beatTime = this.beats[i];
+      const timeUntilBeat = beatTime - currentTime;
+
+      // Show beat if it's coming up soon (within 1.5 seconds)
+      if(timeUntilBeat > -0.2 && timeUntilBeat < 1.5) {
+        const existingBeat = container.querySelector(`[data-beat-index="${i}"]`);
+        if(!existingBeat) {
+          const beatEl = this.createBeatElement(i, beatTime, timeUntilBeat);
+          container.appendChild(beatEl);
+        }
+      }
+    }
+
+    // Check if song ended
+    if(currentTime < this.audioElement.duration) {
+      requestAnimationFrame(() => this.gameLoop());
+    } else {
+      this.endGame();
+    }
+  }
+
+  createBeatElement(index, beatTime, timeUntilBeat) {
+    const beatEl = document.createElement('div');
+    beatEl.className = 'beat-target';
+    beatEl.setAttribute('data-beat-index', index);
+    beatEl.setAttribute('data-beat-time', beatTime);
+    beatEl.style.cssText = `
+      position: absolute;
+      width: 60px;
+      height: 60px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(168, 85, 247, 0.8), rgba(168, 85, 247, 0.2));
+      border: 3px solid #a855f7;
+      cursor: pointer;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%) scale(${1 + timeUntilBeat * 0.2});
+      opacity: ${Math.max(0.3, 1 - timeUntilBeat * 0.5)};
+      transition: all 0.05s linear;
+      user-select: none;
+      pointer-events: auto;
+      z-index: ${100 - index};
+    `;
+
+    beatEl.innerHTML = '🎵';
+    beatEl.style.fontSize = '28px';
+    beatEl.style.display = 'flex';
+    beatEl.style.alignItems = 'center';
+    beatEl.style.justifyContent = 'center';
+
+    beatEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      this.registerClick(beatEl, beatTime);
+    });
+
+    return beatEl;
+  }
+
+  registerClick(beatEl, beatTime) {
+    if(!this.audioElement || beatEl.classList.contains('hit')) return;
+
+    const currentTime = this.audioElement.currentTime;
+    const timeDiff = Math.abs(beatTime - currentTime) * 1000; // convert to ms
+
+    let points = 0;
+    let accuracy = 'miss';
+
+    if(timeDiff <= this.perfectWindow) {
+      points = 50;
+      accuracy = 'perfect';
+      this.combo++;
+    } else if(timeDiff <= this.clickWindow) {
+      points = 25;
+      accuracy = 'good';
+      this.combo++;
+    } else {
+      points = 0;
+      accuracy = 'miss';
+      this.combo = 0;
+    }
+
+    this.score += points;
+    beatEl.classList.add('hit');
+    beatEl.style.background = accuracy === 'perfect' ? 'radial-gradient(circle, #22c55e, #15803d)' : 
+                             accuracy === 'good' ? 'radial-gradient(circle, #06b6d4, #0891b2)' : 
+                             'radial-gradient(circle, #ef4444, #991b1b)';
+    beatEl.style.borderColor = accuracy === 'perfect' ? '#22c55e' : 
+                               accuracy === 'good' ? '#06b6d4' : 
+                               '#ef4444';
+
+    // Show feedback
+    const feedback = document.createElement('div');
+    feedback.style.cssText = `
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      font-weight: bold;
+      font-size: 20px;
+      pointer-events: none;
+      z-index: 999;
+      animation: floatUp 0.8s ease-out forwards;
+    `;
+    
+    if(accuracy === 'perfect') {
+      feedback.textContent = '⭐ PERFECT!';
+      feedback.style.color = '#22c55e';
+    } else if(accuracy === 'good') {
+      feedback.textContent = '✨ GOOD!';
+      feedback.style.color = '#06b6d4';
+    } else {
+      feedback.textContent = '❌ MISS';
+      feedback.style.color = '#ef4444';
+    }
+
+    document.body.appendChild(feedback);
+    setTimeout(() => feedback.remove(), 800);
+
+    this.updateUI();
+    setTimeout(() => beatEl.remove(), 500);
+  }
+
+  updateUI() {
+    const scoreEl = document.getElementById('rhythmScore');
+    const comboEl = document.getElementById('rhythmCombo');
+    
+    if(scoreEl) scoreEl.textContent = this.score;
+    if(comboEl) comboEl.textContent = this.combo;
+  }
+
+  showMessage(msg, duration = 2000) {
+    const msgEl = document.getElementById('rhythmMessage');
+    if(msgEl) {
+      msgEl.textContent = msg;
+      msgEl.style.opacity = '1';
+      setTimeout(() => {
+        msgEl.style.opacity = '0.5';
+      }, duration);
+    }
+  }
+
+  endGame() {
+    this.isActive = false;
+    this.showMessage(`🎉 Game Over! Final Score: ${this.score}`);
+  }
+
+  reset() {
+    this.score = 0;
+    this.combo = 0;
+    this.currentBeatIndex = 0;
+    this.isActive = false;
+    const container = document.getElementById('beatTargets');
+    if(container) container.innerHTML = '';
+    this.updateUI();
+    this.showMessage('🎵 Ready to start!');
+  }
+}
+
 // ========== INITIALIZE ALL GAMES ==========
 document.addEventListener('DOMContentLoaded', () => {
   window.petalClicker = new PetalClicker();
   window.memoryGame = new LoveMemoryGame();
   window.ambientMusic = new AmbientMusic();
+  window.rhythmGame = new RhythmClicker();
 });
 
 // Add CSS animation styles
@@ -670,6 +906,24 @@ style.textContent = `
 
   .clicker-btn:active {
     transform: scale(0.95);
+  }
+
+  .beat-target {
+    box-shadow: 0 0 15px rgba(168, 85, 247, 0.5);
+  }
+
+  .beat-target:hover {
+    box-shadow: 0 0 25px rgba(168, 85, 247, 0.8);
+  }
+
+  .beat-target.hit {
+    pointer-events: none;
+  }
+
+  @keyframes beatPulse {
+    0% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.7); }
+    70% { box-shadow: 0 0 0 15px rgba(168, 85, 247, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0); }
   }
 `;
 document.head.appendChild(style);
