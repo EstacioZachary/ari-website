@@ -719,32 +719,28 @@ class RhythmClicker {
     this.visibleBeats.clear();
     this.isActive = true;
     
-    // Get BPM from input or use default
-    const bpmInput = document.getElementById('rhythmBPM');
-    const customBPM = bpmInput ? parseFloat(bpmInput.value) : null;
-    
-    // Generate beats for current track with custom BPM if provided
+    // Generate beats for current track using custom beat mapping
     const maxDuration = Math.min(this.audioElement.duration || 300, 300);
-    this.beats = this.generateBeatsForTrack(this.currentTrack, maxDuration, customBPM);
+    this.beats = this.generateBeatsForTrack(this.currentTrack, maxDuration);
     
     this.updateUI();
     this.showMessage('🎵 Rhythm game started! Click circles in the green zone!', 2000);
     this.gameLoop();
   }
 
-  generateBeatsForTrack(trackType, maxDuration, overrideBPM = null) {
-    let bpm = overrideBPM;
+  generateBeatsForTrack(trackType, maxDuration) {
+    let bpm = null;
     let beatMap = null;
     
     // Get track data and check for beat map
     const trackData = musicBeatsData[trackType];
-    if(trackData?.beatMap && !overrideBPM) {
+    if(trackData?.beatMap) {
       // Use the custom beat map
       beatMap = trackData.beatMap;
-    } else if(!bpm && trackData) {
-      // Use default BPM
+    } else if(trackData) {
+      // Use default BPM if no custom map
       bpm = trackData.bpm;
-    } else if(!bpm) {
+    } else {
       bpm = 100; // fallback
     }
 
