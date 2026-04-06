@@ -14,8 +14,21 @@ const musicBeatsData = {
   },
   meditation: {
     name: '💕 RomCom Vibes',
-    bpm: 51, // Using half-time (102 quarter notes / 2) for perceptible beat
-    fileName: 'Rob Deniel - RomCom (Official Music Video).mp3'
+    bpm: 51, // Using half-time as default
+    fileName: 'Rob Deniel - RomCom (Official Music Video).mp3',
+    // Custom beat map for RomCom with different sections
+    beatMap: [
+      { start: 0, end: 10, bpm: 51, pattern: 'sparse', beats: 3 },         // Intro
+      { start: 10, end: 50, bpm: 51, pattern: 'steady' },                  // Verse 1
+      { start: 50, end: 65, bpm: 51, pattern: 'steady' },                  // Pre-Chorus
+      { start: 65, end: 100, bpm: 25.5, pattern: 'double' },               // Chorus 1
+      { start: 100, end: 140, bpm: 51, pattern: 'steady' },                // Verse 2
+      { start: 140, end: 155, bpm: 51, pattern: 'steady' },                // Pre-Chorus 2
+      { start: 155, end: 190, bpm: 25.5, pattern: 'double' },              // Chorus 2
+      { start: 190, end: 210, bpm: 51, pattern: 'syncopated' },            // Bridge
+      { start: 210, end: 230, bpm: 25.5, pattern: 'double' },              // Chorus 3
+      { start: 230, end: 237, bpm: 51, pattern: 'sparse', beats: 2 }       // Outro
+    ]
   }
 };
 
@@ -710,21 +723,68 @@ class RhythmClicker {
 
   generateBeatsForTrack(trackType, maxDuration, overrideBPM = null) {
     let bpm = overrideBPM;
+    let beatMap = null;
     
-    // If no override, use the track's default BPM
-    if(!bpm) {
-      const trackData = musicBeatsData[trackType];
-      bpm = trackData ? trackData.bpm : 100;
+    // Get track data and check for beat map
+    const trackData = musicBeatsData[trackType];
+    if(trackData?.beatMap && !overrideBPM) {
+      // Use the custom beat map
+      beatMap = trackData.beatMap;
+    } else if(!bpm && trackData) {
+      // Use default BPM
+      bpm = trackData.bpm;
+    } else if(!bpm) {
+      bpm = 100; // fallback
     }
-    
-    const beatInterval = 60 / bpm;
+
     const beats = [];
-    
-    for(let time = beatInterval; time < maxDuration; time += beatInterval) {
-      beats.push(time);
+
+    if(beatMap) {
+      // Generate beats based on custom sections
+      beatMap.forEach(section => {
+        const sectionStart = section.start;
+        const sectionEnd = Math.min(section.end, maxDuration);
+        
+        if(sectionStart >= maxDuration) return; // Skip if past song duration
+        
+        const beatInterval = 60 / section.bpm;
+
+        if(section.pattern === 'sparse') {
+          // Add specific number of evenly spaced beats
+          const numBeats = section.beats || 3;
+          const spacing = (sectionEnd - sectionStart) / numBeats;
+          for(let i = 0; i < numBeats; i++) {
+            beats.push(sectionStart + (spacing * (i + 0.5)));
+          }
+        } else if(section.pattern === 'syncopated') {
+          // Varied spacing - syncopated pattern
+          const patterns = [beatInterval, beatInterval * 0.75, beatInterval * 1.25, beatInterval];
+          let patternIdx = 0;
+          for(let time = sectionStart + beatInterval; time < sectionEnd; time += patterns[patternIdx % patterns.length]) {
+            beats.push(time);
+            patternIdx++;
+          }
+        } else if(section.pattern === 'double') {
+          // Double the beat density
+          for(let time = sectionStart + beatInterval; time < sectionEnd; time += beatInterval) {
+            beats.push(time);
+          }
+        } else {
+          // steady pattern (default)
+          for(let time = sectionStart + beatInterval; time < sectionEnd; time += beatInterval) {
+            beats.push(time);
+          }
+        }
+      });
+    } else {
+      // Generate uniform beats if no beat map
+      const beatInterval = 60 / bpm;
+      for(let time = beatInterval; time < maxDuration; time += beatInterval) {
+        beats.push(time);
+      }
     }
-    
-    return beats;
+
+    return beats.sort((a, b) => a - b);
   }
 
   gameLoop() {
