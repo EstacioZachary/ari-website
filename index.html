@@ -232,11 +232,23 @@
       </div>
       
       <!-- Rhythm Game Area -->
-      <div class="relative bg-black/40 rounded-xl p-8 border border-purple-500/30 min-h-32 flex items-center justify-center">
-        <div id="rhythmGameContainer" class="relative w-full max-w-2xl h-32 bg-gradient-to-b from-purple-900/20 to-transparent rounded-lg border border-purple-600/30">
+      <div class="relative bg-black/40 rounded-xl p-8 border border-purple-500/30 min-h-64 flex flex-col">
+        <div class="text-center text-purple-300 text-sm mb-3">Click the circles when they reach the green zone ⬇️</div>
+        
+        <!-- Rhythm Track Container -->
+        <div id="rhythmGameContainer" class="relative flex-1 bg-gradient-to-b from-purple-900/20 to-transparent rounded-lg border border-purple-600/30 overflow-hidden min-h-48">
+          <!-- Beat circles fall down here -->
           <div id="beatTargets" class="relative w-full h-full"></div>
+          
+          <!-- Hit Zone (the target line at the bottom) -->
+          <div class="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-green-500/20 to-transparent border-t-2 border-green-400 shadow-lg">
+            <div class="absolute inset-0 flex items-center justify-center">
+              <div class="text-green-400 text-xs font-bold">⬆️ CLICK HERE ⬆️</div>
+            </div>
+          </div>
         </div>
-        <div id="rhythmMessage" class="absolute text-center text-purple-200/60 text-sm">Waiting to start...</div>
+        
+        <div id="rhythmMessage" class="text-center text-purple-200/60 text-sm mt-4">Waiting to start...</div>
       </div>
       
       <div class="mt-4 text-xs text-purple-200/70">

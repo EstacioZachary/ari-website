@@ -633,7 +633,7 @@ class AmbientMusic {
   }
 }
 
-// ========== RHYTHM CLICKER GAME ==========
+// ========== RHYTHM CLICKER GAME (Guitar Hero Style) ==========
 class RhythmClicker {
   constructor() {
     this.score = 0;
@@ -642,9 +642,13 @@ class RhythmClicker {
     this.beats = [];
     this.audioElement = null;
     this.currentTrack = 'ambient';
-    this.clickWindow = 200; // milliseconds
-    this.perfectWindow = 80;
+    this.clickWindow = 150; // milliseconds (±150ms = ±0.15s)
+    this.perfectWindow = 75; // milliseconds (±75ms = ±0.075s)
     this.visibleBeats = new Map();
+    this.fallingSpeed = 200; // pixels per second
+    this.hitZoneTop = 0;
+    this.hitZoneBottom = 0;
+    this.containerHeight = 0;
     
     this.init();
   }
@@ -653,6 +657,21 @@ class RhythmClicker {
     const startBtn = document.getElementById('rhythmStartBtn');
     if(startBtn) {
       startBtn.addEventListener('click', () => this.startGame());
+    }
+
+    // Get hit zone position
+    const container = document.getElementById('rhythmGameContainer');
+    if(container) {
+      const rect = container.getBoundingClientRect();
+      this.containerHeight = rect.height;
+      this.hitZoneTop = this.containerHeight - 80; // 80px from bottom
+      this.hitZoneBottom = this.containerHeight;
+    }
+
+    // Listen for clicks on the game area
+    const beatTargets = document.getElementById('beatTargets');
+    if(beatTargets) {
+      beatTargets.addEventListener('click', (e) => this.handleGameClick(e));
     }
   }
 
@@ -676,12 +695,12 @@ class RhythmClicker {
     this.visibleBeats.clear();
     this.isActive = true;
     
-    // Generate beats for current track (limit to song duration)
+    // Generate beats for current track
     const maxDuration = Math.min(this.audioElement.duration || 300, 300);
     this.beats = this.generateBeatsForTrack(this.currentTrack, maxDuration);
     
     this.updateUI();
-    this.showMessage('🎵 Rhythm game started! Click to the beat!', 2000);
+    this.showMessage('🎵 Rhythm game started! Click circles in the green zone!', 2000);
     this.gameLoop();
   }
 
@@ -710,170 +729,128 @@ class RhythmClicker {
       return;
     }
 
-    // Find the NEXT beat only (not all upcoming beats)
-    const nextBeat = this.beats.find(beatTime => beatTime > currentTime - 0.3);
-    
-    if(!nextBeat) {
-      // No more beats, end game
-      requestAnimationFrame(() => this.gameLoop());
-      return;
-    }
+    // Find upcoming beats (within 3 seconds of falling)
+    const upcomingBeats = this.beats.filter(beatTime => {
+      const timeFromNow = beatTime - currentTime;
+      return timeFromNow > -0.5 && timeFromNow <= 3;
+    });
 
-    const timeUntilBeat = nextBeat - currentTime;
-
-    // Only show beat if it's within the clickable window (before and after)
-    if(timeUntilBeat > -0.2 && timeUntilBeat <= 2) {
-      // Check if this beat is already displayed
-      let beatEl = this.visibleBeats.get(nextBeat);
-      
-      if(!beatEl) {
-        // Clear the container to only show one beat
-        container.innerHTML = '';
-        
-        // Create fresh beat element
-        beatEl = this.createBeatElement(nextBeat);
+    // Add new beat elements
+    upcomingBeats.forEach(beatTime => {
+      if(!this.visibleBeats.has(beatTime)) {
+        const beatEl = this.createBeatElement(beatTime);
         container.appendChild(beatEl);
-        this.visibleBeats.clear();
-        this.visibleBeats.set(nextBeat, beatEl);
+        this.visibleBeats.set(beatTime, beatEl);
       }
+    });
+
+    // Update all falling beats
+    for(let [beatTime, beatEl] of this.visibleBeats) {
+      const timeFromNow = beatTime - currentTime;
       
-      // Update the single beat element
-      this.updateBeatElement(beatEl, nextBeat, currentTime);
-    } else if(timeUntilBeat <= -0.2) {
-      // Beat has passed, remove it and move to next
-      const beatEl = this.visibleBeats.get(nextBeat);
-      if(beatEl) {
-        if(!beatEl.classList.contains('hit')) {
+      if(timeFromNow < -0.5) {
+        // Beat has passed - remove it
+        if(!beatEl.classList.contains('hit') && !beatEl.classList.contains('missed')) {
+          beatEl.classList.add('missed');
           this.combo = 0;
         }
-        beatEl.remove();
-        this.visibleBeats.delete(nextBeat);
+        setTimeout(() => beatEl.remove(), 300);
+        this.visibleBeats.delete(beatTime);
+      } else {
+        // Update position (falling from top to bottom)
+        this.updateBeatPosition(beatEl, timeFromNow);
       }
     }
 
-    // Continue loop
-    if(this.audioElement.paused && currentTime > 0 && this.isActive) {
-      // Music stopped
-      this.endGame();
-    } else if(this.isActive) {
+    // Check if song ended
+    if(!this.audioElement.paused && this.isActive) {
       requestAnimationFrame(() => this.gameLoop());
+    } else if(this.audioElement.paused && currentTime > 0 && this.isActive) {
+      this.endGame();
     }
   }
 
   createBeatElement(beatTime) {
     const beatEl = document.createElement('div');
-    beatEl.className = 'beat-target';
-    beatEl.setAttribute('data-beat-time', beatTime.toFixed(2));
-    
+    beatEl.className = 'falling-beat';
+    beatEl.setAttribute('data-beat-time', beatTime.toFixed(3));
     beatEl.innerHTML = '🎵';
-    
-    // Create and append outer ring
-    const ringEl = document.createElement('div');
-    ringEl.className = 'beat-ring';
-    beatEl.appendChild(ringEl);
-    
-    beatEl.addEventListener('click', (e) => {
-      e.stopPropagation();
-      this.registerClick(beatEl, beatTime);
-    });
-    
     return beatEl;
   }
 
-  updateBeatElement(beatEl, beatTime, currentTime) {
-    const timeUntilBeat = beatTime - currentTime;
-    
-    // Smooth scaling: gets bigger as you approach the beat
-    let scale = 0.7;
-    if(timeUntilBeat > 0) {
-      // Before the beat: scale grows from 0.7 to 1.1 as we approach
-      scale = 0.7 + Math.max(0, Math.min(0.4, 1.5 - timeUntilBeat)) * 0.4;
-    } else if(timeUntilBeat > -0.2) {
-      // At/after the beat: stay large
-      scale = 1.1;
-    }
-    
-    let opacity = Math.max(0.3, 1 - Math.max(0, timeUntilBeat - 2) * 0.5);
-    
-    // Determine state and color
-    let color = '#a855f7';
-    let textContent = '🎵';
-    let glowIntensity = 0.5;
-    
-    if(Math.abs(timeUntilBeat) <= (this.perfectWindow / 1000)) {
-      // PERFECT ZONE - Bright green, pulsing strongly
-      color = '#22c55e';
-      textContent = '✨ NOW! ✨';
-      beatEl.style.borderColor = '#22c55e';
-      beatEl.style.background = 'radial-gradient(circle, rgba(34, 197, 94, 0.9), rgba(34, 197, 94, 0.2))';
-      beatEl.style.boxShadow = `0 0 40px rgba(34, 197, 94, 1), inset 0 0 20px rgba(34, 197, 94, 0.3)`;
-      glowIntensity = 1;
-      scale = 1.15;
-    } else if(Math.abs(timeUntilBeat) <= (this.clickWindow / 1000)) {
-      // GOOD ZONE - Cyan, ready to click
-      color = '#06b6d4';
-      textContent = '🎵 READY!';
-      beatEl.style.borderColor = '#06b6d4';
-      beatEl.style.background = 'radial-gradient(circle, rgba(6, 182, 212, 0.8), rgba(6, 182, 212, 0.1))';
-      beatEl.style.boxShadow = `0 0 35px rgba(6, 182, 212, 0.9)`;
-      glowIntensity = 0.9;
-      scale = 1.08;
-    } else if(timeUntilBeat > 0 && timeUntilBeat <= 0.8) {
-      // APPROACHING - Yellow countdown
-      color = '#eab308';
-      beatEl.style.borderColor = '#eab308';
-      beatEl.style.background = 'radial-gradient(circle, rgba(234, 179, 8, 0.7), rgba(234, 179, 8, 0.1))';
-      beatEl.style.boxShadow = `0 0 30px rgba(234, 179, 8, 0.8)`;
-      const countDown = Math.max(0, Math.ceil(timeUntilBeat * 2.5));
-      if(countDown <= 0) {
-        textContent = '🚀 GO!';
-      } else {
-        textContent = `⏱️ ${countDown}`;
-      }
-      glowIntensity = 0.8;
-    } else if(timeUntilBeat > 0.8) {
-      // FAR AWAY - Purple, prepare
-      color = '#a855f7';
-      textContent = '🎵';
-      beatEl.style.borderColor = '#a855f7';
-      beatEl.style.background = 'radial-gradient(circle, rgba(168, 85, 247, 0.6), rgba(168, 85, 247, 0.1))';
-      beatEl.style.boxShadow = `0 0 20px rgba(168, 85, 247, 0.6)`;
-      glowIntensity = 0.5;
-    } else {
-      // PASSED - Red miss indicator
-      color = '#ef4444';
-      textContent = '❌ MISSED!';
-      beatEl.style.borderColor = '#ef4444';
-      beatEl.style.background = 'radial-gradient(circle, rgba(239, 68, 68, 0.6), rgba(239, 68, 68, 0.1))';
-      beatEl.style.boxShadow = `0 0 20px rgba(239, 68, 68, 0.6)`;
-      glowIntensity = 0.4;
-    }
-    
-    beatEl.innerHTML = textContent;
-    beatEl.style.fontSize = Math.abs(timeUntilBeat) <= (this.perfectWindow / 1000) ? '22px' : '28px';
-    beatEl.style.fontWeight = 'bold';
-    beatEl.style.transform = `translate(-50%, -50%) scale(${scale})`;
-    beatEl.style.opacity = opacity;
+  updateBeatPosition(beatEl, timeFromNow) {
+    // Calculate Y position: circles fall down as they approach
+    // At timeFromNow = 3: top of screen (Y = 0)
+    // At timeFromNow = 0: hit zone (Y = hitZoneTop)
+    // At timeFromNow = -0.5: bottom (removed)
 
-    // Update outer ring
-    let ringEl = beatEl.querySelector('.beat-ring');
-    if(ringEl) {
-      let ringScale = 0.8;
-      if(timeUntilBeat > 0) {
-        ringScale = Math.max(0.8, 2.5 - timeUntilBeat * 1.5);
-      }
-      let ringOpacity = Math.max(0.1, 1 - timeUntilBeat * 2);
-      
-      ringEl.style.borderColor = color;
-      ringEl.style.transform = `translate(-50%, -50%) scale(${ringScale})`;
-      ringEl.style.opacity = Math.min(ringOpacity, glowIntensity);
-      ringEl.style.borderWidth = glowIntensity > 0.7 ? '3px' : '2px';
+    let posY = 0;
+    if(timeFromNow > 0) {
+      posY = this.containerHeight - (timeFromNow * this.fallingSpeed);
+    } else {
+      posY = this.hitZoneTop + (timeFromNow * this.fallingSpeed / 0.5);
     }
+
+    // Clamp to visible area
+    posY = Math.max(-100, Math.min(this.containerHeight + 50, posY));
+
+    // Determine if circle is in hit zone
+    const inHitZone = posY >= this.hitZoneTop - 20 && posY <= this.hitZoneBottom - 20;
+
+    // Update beat appearance based on position
+    let bgColor = 'rgba(168, 85, 247, 0.6)';
+    let borderColor = '#a855f7';
+    let scale = 0.8;
+
+    if(inHitZone) {
+      // In the green hit zone - ready to click
+      bgColor = 'rgba(34, 197, 94, 0.8)';
+      borderColor = '#22c55e';
+      scale = 1;
+      beatEl.style.boxShadow = '0 0 30px rgba(34, 197, 94, 0.9)';
+    } else if(timeFromNow > 0 && timeFromNow < 0.5) {
+      // Approaching hit zone - cyan
+      bgColor = 'rgba(6, 182, 212, 0.7)';
+      borderColor = '#06b6d4';
+      scale = 0.9;
+      beatEl.style.boxShadow = '0 0 20px rgba(6, 182, 212, 0.7)';
+    } else {
+      // Far from hit zone
+      bgColor = 'rgba(168, 85, 247, 0.6)';
+      borderColor = '#a855f7';
+      scale = 0.7;
+      beatEl.style.boxShadow = '0 0 15px rgba(168, 85, 247, 0.5)';
+    }
+
+    beatEl.style.top = posY + 'px';
+    beatEl.style.background = bgColor;
+    beatEl.style.borderColor = borderColor;
+    beatEl.style.transform = `translate(-50%, -50%) scale(${scale})`;
   }
 
-  registerClick(beatEl, beatTime) {
-    if(!this.audioElement || beatEl.classList.contains('hit')) return;
+  handleGameClick(e) {
+    if(!this.isActive) return;
 
+    // Find the closest beat in the hit zone
+    let closestBeat = null;
+    let closestDist = Infinity;
+
+    for(let [beatTime, beatEl] of this.visibleBeats) {
+      if(beatEl.classList.contains('hit') || beatEl.classList.contains('missed')) continue;
+
+      const posY = parseFloat(beatEl.style.top);
+      const distFromHitZone = Math.abs(posY - (this.hitZoneTop + (this.hitZoneBottom - this.hitZoneTop) / 2));
+
+      if(distFromHitZone < 60 && distFromHitZone < closestDist) {
+        closestDist = distFromHitZone;
+        closestBeat = { time: beatTime, el: beatEl };
+      }
+    }
+
+    if(!closestBeat) return;
+
+    const beatTime = closestBeat.time;
+    const beatEl = closestBeat.el;
     const currentTime = this.audioElement.currentTime;
     const timeDiff = Math.abs(beatTime - currentTime) * 1000;
 
@@ -900,19 +877,19 @@ class RhythmClicker {
 
     this.score += points;
     beatEl.classList.add('hit');
-    beatEl.style.borderColor = color;
     beatEl.style.background = `radial-gradient(circle, ${color}, ${color}22)`;
+    beatEl.style.borderColor = color;
     beatEl.style.pointerEvents = 'none';
 
-    // Burst animation
+    // Burst animation at hit location
     this.createBurst(beatEl, color);
 
-    // Show feedback text
+    // Show feedback
     const feedback = document.createElement('div');
     feedback.style.cssText = `
       position: fixed;
       left: 50%;
-      top: 40%;
+      top: 50%;
       transform: translate(-50%, -50%);
       font-weight: bold;
       font-size: 28px;
@@ -1022,7 +999,7 @@ class RhythmClicker {
     this.isActive = false;
     const container = document.getElementById('beatTargets');
     if(container) {
-      container.querySelectorAll('.beat-target').forEach(el => el.remove());
+      container.querySelectorAll('.falling-beat').forEach(el => el.remove());
     }
     this.visibleBeats.clear();
     this.updateUI();
@@ -1109,50 +1086,39 @@ style.textContent = `
     transform: scale(0.95);
   }
 
-  .beat-target {
+  .falling-beat {
     position: absolute;
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(168, 85, 247, 0.7), rgba(168, 85, 247, 0.1));
-    border: 3px solid #a855f7;
+    width: 70px;
+    height: 70px;
     left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%) scale(0.8);
-    cursor: pointer;
-    user-select: none;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(168, 85, 247, 0.7), rgba(168, 85, 247, 0.2));
+    border: 3px solid #a855f7;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 32px;
+    cursor: pointer;
+    user-select: none;
     z-index: 50;
     transition: all 0.08s ease-out;
     box-shadow: 0 0 15px rgba(168, 85, 247, 0.5);
-    overflow: visible;
   }
 
-  .beat-ring {
-    position: absolute;
-    width: 150px;
-    height: 150px;
-    border: 2px solid #a855f7;
-    border-radius: 50%;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    pointer-events: none;
-    z-index: -1;
-    transition: all 0.08s ease-out;
-  }
-
-  .beat-target:hover {
+  .falling-beat:hover {
     box-shadow: 0 0 25px rgba(168, 85, 247, 0.8);
-    transform: translate(-50%, -50%) scale(0.95);
+    transform: translate(-50%, -50%) scale(1.1);
   }
 
-  .beat-target.hit {
+  .falling-beat.hit {
     pointer-events: none;
     animation: beatHit 0.4s ease-out forwards;
+  }
+
+  .falling-beat.missed {
+    opacity: 0.3;
+    filter: grayscale(1);
   }
 
   @keyframes beatHit {
@@ -1164,12 +1130,6 @@ style.textContent = `
       transform: translate(-50%, -50%) scale(1.3);
       opacity: 0;
     }
-  }
-
-  @keyframes beatPulse {
-    0% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.7); }
-    70% { box-shadow: 0 0 0 15px rgba(168, 85, 247, 0); }
-    100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0); }
   }
 `;
 document.head.appendChild(style);
