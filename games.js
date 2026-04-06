@@ -68,7 +68,7 @@ class PetalClicker {
     if(this.points >= neededPoints) {
       this.level++;
       this.pointsPerClick += 1;
-      this.multiplier = 1 + (this.level * 1);
+      this.multiplier = 1 + (this.level * 0.3);
       this.showLevelUpEffect();
     }
   }
@@ -138,7 +138,7 @@ class PetalClicker {
   }
 
   updateUI() {
-    if(this.pointsDisplay) this.pointsDisplay.textContent = this.points;
+    if(this.pointsDisplay) this.pointsDisplay.textContent = Math.floor(this.points);
     if(this.levelDisplay) this.levelDisplay.textContent = this.level;
   }
 
@@ -398,6 +398,24 @@ class AmbientMusic {
       });
     }
 
+    const progressSlider = document.getElementById('musicProgress');
+    if(progressSlider) {
+      progressSlider.addEventListener('input', (e) => {
+        if(this.audioElement && this.audioElement.duration) {
+          this.audioElement.currentTime = (e.target.value / 100) * this.audioElement.duration;
+        }
+      });
+    }
+
+    // Update time display as music plays
+    this.audioElement.addEventListener('timeupdate', () => {
+      this.updateTimeDisplay();
+    });
+
+    this.audioElement.addEventListener('loadedmetadata', () => {
+      this.updateTimeDisplay();
+    });
+
     if(musicTypeBtn) {
       musicTypeBtn.addEventListener('click', () => this.nextMusicType());
     }
@@ -547,6 +565,31 @@ class AmbientMusic {
     const toggleBtn = document.getElementById('musicToggle');
     if(toggleBtn) {
       toggleBtn.textContent = this.isPlaying ? '🎵 Music: ON' : '🎵 Music: OFF';
+    }
+  }
+
+  formatTime(seconds) {
+    if(isNaN(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  updateTimeDisplay() {
+    const currentTimeEl = document.getElementById('timeCurrent');
+    const durationEl = document.getElementById('timeDuration');
+    const progressSlider = document.getElementById('musicProgress');
+
+    if(currentTimeEl && this.audioElement) {
+      currentTimeEl.textContent = this.formatTime(this.audioElement.currentTime);
+    }
+
+    if(durationEl && this.audioElement) {
+      durationEl.textContent = this.formatTime(this.audioElement.duration);
+    }
+
+    if(progressSlider && this.audioElement && this.audioElement.duration) {
+      progressSlider.value = (this.audioElement.currentTime / this.audioElement.duration) * 100;
     }
   }
 }
