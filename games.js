@@ -18,16 +18,16 @@ const musicBeatsData = {
     fileName: 'Rob Deniel - RomCom (Official Music Video).mp3',
     // Custom beat map for RomCom with different sections
     beatMap: [
-      { start: 0, end: 10, bpm: 51, pattern: 'sparse', beats: 3 },         // Intro
-      { start: 10, end: 50, bpm: 51, pattern: 'steady' },                  // Verse 1
-      { start: 50, end: 65, bpm: 51, pattern: 'steady' },                  // Pre-Chorus
-      { start: 65, end: 100, bpm: 25.5, pattern: 'double' },               // Chorus 1
-      { start: 100, end: 140, bpm: 51, pattern: 'steady' },                // Verse 2
-      { start: 140, end: 155, bpm: 51, pattern: 'steady' },                // Pre-Chorus 2
-      { start: 155, end: 190, bpm: 25.5, pattern: 'double' },              // Chorus 2
-      { start: 190, end: 210, bpm: 51, pattern: 'syncopated' },            // Bridge
-      { start: 210, end: 230, bpm: 25.5, pattern: 'double' },              // Chorus 3
-      { start: 230, end: 237, bpm: 51, pattern: 'sparse', beats: 2 }       // Outro
+      { start: 0, end: 10, bpm: 51, pattern: 'sparse', beats: 0, vocal: false },     // Intro (no singing)
+      { start: 10, end: 50, bpm: 51, pattern: 'steady', vocal: true },               // Verse 1
+      { start: 50, end: 65, bpm: 51, pattern: 'steady', vocal: true },               // Pre-Chorus
+      { start: 65, end: 100, bpm: 25.5, pattern: 'double', vocal: true },            // Chorus 1
+      { start: 100, end: 140, bpm: 51, pattern: 'steady', vocal: true },             // Verse 2
+      { start: 140, end: 155, bpm: 51, pattern: 'steady', vocal: true },             // Pre-Chorus 2
+      { start: 155, end: 190, bpm: 25.5, pattern: 'double', vocal: true },           // Chorus 2
+      { start: 190, end: 210, bpm: 51, pattern: 'syncopated', vocal: true },         // Bridge
+      { start: 210, end: 230, bpm: 25.5, pattern: 'double', vocal: true },           // Chorus 3
+      { start: 230, end: 237, bpm: 51, pattern: 'sparse', beats: 0, vocal: true }    // Outro
     ]
   }
 };
@@ -670,7 +670,18 @@ class RhythmClicker {
     const startBtn = document.getElementById('rhythmStartBtn');
     if(startBtn) {
       startBtn.addEventListener('click', () => this.startGame());
+      startBtn.textContent = '🎮 Rhythm Game (Auto-starts with music)';
     }
+
+    // Auto-start when music plays
+    const observer = setInterval(() => {
+      if(window.ambientMusic && window.ambientMusic.isPlaying) {
+        if(!this.isActive) {
+          this.startGame();
+        }
+        clearInterval(observer);
+      }
+    }, 100);
 
     // Get hit zone position
     const container = document.getElementById('rhythmGameContainer');
@@ -742,6 +753,9 @@ class RhythmClicker {
     if(beatMap) {
       // Generate beats based on custom sections
       beatMap.forEach(section => {
+        // Skip sections without vocals
+        if(section.vocal === false) return;
+        
         const sectionStart = section.start;
         const sectionEnd = Math.min(section.end, maxDuration);
         
@@ -750,11 +764,13 @@ class RhythmClicker {
         const beatInterval = 60 / section.bpm;
 
         if(section.pattern === 'sparse') {
-          // Add specific number of evenly spaced beats
-          const numBeats = section.beats || 3;
-          const spacing = (sectionEnd - sectionStart) / numBeats;
-          for(let i = 0; i < numBeats; i++) {
-            beats.push(sectionStart + (spacing * (i + 0.5)));
+          // Add specific number of evenly spaced beats (or skip if beats: 0)
+          const numBeats = section.beats || 0;
+          if(numBeats > 0) {
+            const spacing = (sectionEnd - sectionStart) / numBeats;
+            for(let i = 0; i < numBeats; i++) {
+              beats.push(sectionStart + (spacing * (i + 0.5)));
+            }
           }
         } else if(section.pattern === 'syncopated') {
           // Varied spacing - syncopated pattern
@@ -798,6 +814,12 @@ class RhythmClicker {
       return;
     }
 
+    // Check if music is paused/stopped
+    if(this.audioElement.paused) {
+      this.endGame();
+      return;
+    }
+
     // Find upcoming beats (within 3 seconds of falling)
     const upcomingBeats = this.beats.filter(beatTime => {
       const timeFromNow = beatTime - currentTime;
@@ -831,12 +853,8 @@ class RhythmClicker {
       }
     }
 
-    // Check if song ended
-    if(!this.audioElement.paused && this.isActive) {
-      requestAnimationFrame(() => this.gameLoop());
-    } else if(this.audioElement.paused && currentTime > 0 && this.isActive) {
-      this.endGame();
-    }
+    // Continue loop
+    requestAnimationFrame(() => this.gameLoop());
   }
 
   createBeatElement(beatTime) {
@@ -1072,7 +1090,7 @@ class RhythmClicker {
     }
     this.visibleBeats.clear();
     this.updateUI();
-    this.showMessage('🎵 Ready to start!');
+    this.showMessage('🎵 Game reset. Play music to start!');
   }
 }
 
