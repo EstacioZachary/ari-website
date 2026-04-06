@@ -14,7 +14,7 @@ const musicBeatsData = {
   },
   meditation: {
     name: '💕 RomCom Vibes',
-    bpm: 102,
+    bpm: 51, // Using half-time (102 quarter notes / 2) for perceptible beat
     fileName: 'Rob Deniel - RomCom (Official Music Video).mp3'
   }
 };
@@ -695,20 +695,29 @@ class RhythmClicker {
     this.visibleBeats.clear();
     this.isActive = true;
     
-    // Generate beats for current track
+    // Get BPM from input or use default
+    const bpmInput = document.getElementById('rhythmBPM');
+    const customBPM = bpmInput ? parseFloat(bpmInput.value) : null;
+    
+    // Generate beats for current track with custom BPM if provided
     const maxDuration = Math.min(this.audioElement.duration || 300, 300);
-    this.beats = this.generateBeatsForTrack(this.currentTrack, maxDuration);
+    this.beats = this.generateBeatsForTrack(this.currentTrack, maxDuration, customBPM);
     
     this.updateUI();
     this.showMessage('🎵 Rhythm game started! Click circles in the green zone!', 2000);
     this.gameLoop();
   }
 
-  generateBeatsForTrack(trackType, maxDuration) {
-    const trackData = musicBeatsData[trackType];
-    if(!trackData) return [];
+  generateBeatsForTrack(trackType, maxDuration, overrideBPM = null) {
+    let bpm = overrideBPM;
     
-    const beatInterval = 60 / trackData.bpm;
+    // If no override, use the track's default BPM
+    if(!bpm) {
+      const trackData = musicBeatsData[trackType];
+      bpm = trackData ? trackData.bpm : 100;
+    }
+    
+    const beatInterval = 60 / bpm;
     const beats = [];
     
     for(let time = beatInterval; time < maxDuration; time += beatInterval) {
