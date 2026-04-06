@@ -772,20 +772,83 @@ class RhythmClicker {
     
     let opacity = Math.max(0.2, 1 - Math.abs(timeUntilBeat - 0.5) * 0.8);
     
-    // Perfect timing zone - turn green
+    // Create outer ring that shrinks toward beat
+    let ringScale = Math.max(1, 3 - (timeUntilBeat / 0.5));
+    let ringOpacity = Math.max(0, 1 - timeUntilBeat * 2);
+    
+    // Determine color based on timing zone
+    let color = '#a855f7';
+    let textContent = '🎵';
+    
     if(Math.abs(timeUntilBeat) <= (this.perfectWindow / 1000)) {
+      // Perfect zone - bright green
+      color = '#22c55e';
       beatEl.style.borderColor = '#22c55e';
-      beatEl.style.boxShadow = '0 0 20px rgba(34, 197, 94, 0.8)';
+      beatEl.style.background = 'radial-gradient(circle, rgba(34, 197, 94, 0.8), rgba(34, 197, 94, 0.1))';
+      beatEl.style.boxShadow = '0 0 30px rgba(34, 197, 94, 0.9)';
+      textContent = '✨ NOW! ✨';
     } else if(Math.abs(timeUntilBeat) <= (this.clickWindow / 1000)) {
+      // Good zone - cyan
+      color = '#06b6d4';
       beatEl.style.borderColor = '#06b6d4';
-      beatEl.style.boxShadow = '0 0 15px rgba(6, 182, 212, 0.6)';
-    } else {
+      beatEl.style.background = 'radial-gradient(circle, rgba(6, 182, 212, 0.7), rgba(6, 182, 212, 0.1))';
+      beatEl.style.boxShadow = '0 0 25px rgba(6, 182, 212, 0.8)';
+      textContent = '🎵 READY!';
+    } else if(timeUntilBeat > 0 && timeUntilBeat <= 1) {
+      // Approaching - yellow
+      color = '#eab308';
+      beatEl.style.borderColor = '#eab308';
+      beatEl.style.background = 'radial-gradient(circle, rgba(234, 179, 8, 0.6), rgba(234, 179, 8, 0.1))';
+      beatEl.style.boxShadow = '0 0 20px rgba(234, 179, 8, 0.7)';
+      const countDown = Math.max(1, Math.ceil(timeUntilBeat * 2));
+      textContent = countDown === 1 ? '🚀 GO!' : `⏱️ ${countDown}`;
+    } else if(timeUntilBeat > 1) {
+      // Far away - purple
+      color = '#a855f7';
       beatEl.style.borderColor = '#a855f7';
-      beatEl.style.boxShadow = '0 0 10px rgba(168, 85, 247, 0.5)';
+      beatEl.style.background = 'radial-gradient(circle, rgba(168, 85, 247, 0.7), rgba(168, 85, 247, 0.1))';
+      beatEl.style.boxShadow = '0 0 15px rgba(168, 85, 247, 0.5)';
+      textContent = '🎵';
+    } else {
+      // Passed the beat
+      color = '#ef4444';
+      beatEl.style.borderColor = '#ef4444';
+      beatEl.style.background = 'radial-gradient(circle, rgba(239, 68, 68, 0.5), rgba(239, 68, 68, 0.1))';
+      beatEl.style.boxShadow = '0 0 15px rgba(239, 68, 68, 0.5)';
+      textContent = '❌ MISS!';
     }
     
+    beatEl.innerHTML = textContent;
+    beatEl.style.fontSize = Math.abs(timeUntilBeat) <= (this.perfectWindow / 1000) ? '24px' : '32px';
+    beatEl.style.fontWeight = 'bold';
     beatEl.style.transform = `translate(-50%, -50%) scale(${scale})`;
     beatEl.style.opacity = opacity;
+
+    // Add outer ring that contracts
+    let ringEl = beatEl.querySelector('.beat-ring');
+    if(!ringEl && timeUntilBeat > -0.2 && timeUntilBeat < 2) {
+      ringEl = document.createElement('div');
+      ringEl.className = 'beat-ring';
+      ringEl.style.cssText = `
+        position: absolute;
+        width: 150px;
+        height: 150px;
+        border: 2px solid ${color};
+        border-radius: 50%;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%) scale(${ringScale});
+        opacity: ${ringOpacity};
+        pointer-events: none;
+      `;
+      beatEl.appendChild(ringEl);
+    }
+    
+    if(ringEl) {
+      ringEl.style.borderColor = color;
+      ringEl.style.transform = `translate(-50%, -50%) scale(${ringScale})`;
+      ringEl.style.opacity = ringOpacity;
+    }
   }
 
   registerClick(beatEl, beatTime) {
@@ -1041,10 +1104,25 @@ style.textContent = `
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 36px;
+    font-size: 32px;
     z-index: 50;
-    transition: all 0.06s ease-out;
+    transition: all 0.08s ease-out;
     box-shadow: 0 0 15px rgba(168, 85, 247, 0.5);
+    overflow: visible;
+  }
+
+  .beat-ring {
+    position: absolute;
+    width: 150px;
+    height: 150px;
+    border: 2px solid #a855f7;
+    border-radius: 50%;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    pointer-events: none;
+    z-index: -1;
+    transition: all 0.08s ease-out;
   }
 
   .beat-target:hover {
