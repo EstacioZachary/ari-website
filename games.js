@@ -640,11 +640,11 @@ class RhythmClicker {
     this.combo = 0;
     this.isActive = false;
     this.beats = [];
-    this.currentBeatIndex = 0;
     this.audioElement = null;
     this.currentTrack = 'ambient';
     this.clickWindow = 200; // milliseconds
-    this.perfectWindow = 100;
+    this.perfectWindow = 80;
+    this.visibleBeats = new Map();
     
     this.init();
   }
@@ -673,15 +673,30 @@ class RhythmClicker {
 
     this.score = 0;
     this.combo = 0;
-    this.currentBeatIndex = 0;
+    this.visibleBeats.clear();
     this.isActive = true;
     
-    // Generate beats for current track
-    this.beats = getBeatsForTrack(this.currentTrack);
+    // Generate beats for current track (limit to song duration)
+    const maxDuration = Math.min(this.audioElement.duration || 300, 300);
+    this.beats = this.generateBeatsForTrack(this.currentTrack, maxDuration);
     
     this.updateUI();
     this.showMessage('🎵 Rhythm game started! Click to the beat!', 2000);
     this.gameLoop();
+  }
+
+  generateBeatsForTrack(trackType, maxDuration) {
+    const trackData = musicBeatsData[trackType];
+    if(!trackData) return [];
+    
+    const beatInterval = 60 / trackData.bpm;
+    const beats = [];
+    
+    for(let time = beatInterval; time < maxDuration; time += beatInterval) {
+      beats.push(time);
+    }
+    
+    return beats;
   }
 
   gameLoop() {
@@ -695,130 +710,139 @@ class RhythmClicker {
       return;
     }
 
-    // Remove expired beat targets
-    const beatElements = document.querySelectorAll('.beat-target');
-    beatElements.forEach(el => {
-      const beatTime = parseFloat(el.getAttribute('data-beat-time'));
-      if(currentTime > beatTime + (this.clickWindow / 1000)) {
-        // Beat window passed - miss
-        if(!el.classList.contains('hit')) {
-          this.combo = 0;
-        }
-        el.remove();
+    // Find beats to display (coming within 2 seconds)
+    const upcomingBeats = this.beats.filter(beatTime => {
+      const timeUntilBeat = beatTime - currentTime;
+      return timeUntilBeat > -0.3 && timeUntilBeat <= 2;
+    });
+
+    // Add new beat elements that aren't already visible
+    upcomingBeats.forEach(beatTime => {
+      if(!this.visibleBeats.has(beatTime)) {
+        const beatEl = this.createBeatElement(beatTime);
+        container.appendChild(beatEl);
+        this.visibleBeats.set(beatTime, beatEl);
+      } else {
+        // Update existing beat element
+        const beatEl = this.visibleBeats.get(beatTime);
+        this.updateBeatElement(beatEl, beatTime, currentTime);
       }
     });
 
-    // Show upcoming beats
-    for(let i = this.currentBeatIndex; i < this.beats.length && i < this.currentBeatIndex + 5; i++) {
-      const beatTime = this.beats[i];
-      const timeUntilBeat = beatTime - currentTime;
-
-      // Show beat if it's coming up soon (within 1.5 seconds)
-      if(timeUntilBeat > -0.2 && timeUntilBeat < 1.5) {
-        const existingBeat = container.querySelector(`[data-beat-index="${i}"]`);
-        if(!existingBeat) {
-          const beatEl = this.createBeatElement(i, beatTime, timeUntilBeat);
-          container.appendChild(beatEl);
+    // Remove beats that have passed
+    for(let [beatTime, beatEl] of this.visibleBeats) {
+      if(currentTime > beatTime + (this.clickWindow / 1000)) {
+        if(!beatEl.classList.contains('hit')) {
+          this.combo = 0;
         }
+        beatEl.remove();
+        this.visibleBeats.delete(beatTime);
       }
     }
 
-    // Check if song ended
-    if(currentTime < this.audioElement.duration) {
-      requestAnimationFrame(() => this.gameLoop());
-    } else {
+    // Continue loop
+    if(this.audioElement.paused && currentTime > 0 && this.isActive) {
+      // Music stopped
       this.endGame();
+    } else if(this.isActive) {
+      requestAnimationFrame(() => this.gameLoop());
     }
   }
 
-  createBeatElement(index, beatTime, timeUntilBeat) {
+  createBeatElement(beatTime) {
     const beatEl = document.createElement('div');
     beatEl.className = 'beat-target';
-    beatEl.setAttribute('data-beat-index', index);
-    beatEl.setAttribute('data-beat-time', beatTime);
-    beatEl.style.cssText = `
-      position: absolute;
-      width: 60px;
-      height: 60px;
-      border-radius: 50%;
-      background: radial-gradient(circle, rgba(168, 85, 247, 0.8), rgba(168, 85, 247, 0.2));
-      border: 3px solid #a855f7;
-      cursor: pointer;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%) scale(${1 + timeUntilBeat * 0.2});
-      opacity: ${Math.max(0.3, 1 - timeUntilBeat * 0.5)};
-      transition: all 0.05s linear;
-      user-select: none;
-      pointer-events: auto;
-      z-index: ${100 - index};
-    `;
-
+    beatEl.setAttribute('data-beat-time', beatTime.toFixed(2));
+    
     beatEl.innerHTML = '🎵';
-    beatEl.style.fontSize = '28px';
-    beatEl.style.display = 'flex';
-    beatEl.style.alignItems = 'center';
-    beatEl.style.justifyContent = 'center';
-
     beatEl.addEventListener('click', (e) => {
       e.stopPropagation();
       this.registerClick(beatEl, beatTime);
     });
-
+    
     return beatEl;
+  }
+
+  updateBeatElement(beatEl, beatTime, currentTime) {
+    const timeUntilBeat = beatTime - currentTime;
+    
+    // Animate the circle size and opacity based on time until beat
+    let scale = 0.6 + (1 - (timeUntilBeat / 2)) * 0.6;
+    scale = Math.max(0.3, Math.min(1.2, scale));
+    
+    let opacity = Math.max(0.2, 1 - Math.abs(timeUntilBeat - 0.5) * 0.8);
+    
+    // Perfect timing zone - turn green
+    if(Math.abs(timeUntilBeat) <= (this.perfectWindow / 1000)) {
+      beatEl.style.borderColor = '#22c55e';
+      beatEl.style.boxShadow = '0 0 20px rgba(34, 197, 94, 0.8)';
+    } else if(Math.abs(timeUntilBeat) <= (this.clickWindow / 1000)) {
+      beatEl.style.borderColor = '#06b6d4';
+      beatEl.style.boxShadow = '0 0 15px rgba(6, 182, 212, 0.6)';
+    } else {
+      beatEl.style.borderColor = '#a855f7';
+      beatEl.style.boxShadow = '0 0 10px rgba(168, 85, 247, 0.5)';
+    }
+    
+    beatEl.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    beatEl.style.opacity = opacity;
   }
 
   registerClick(beatEl, beatTime) {
     if(!this.audioElement || beatEl.classList.contains('hit')) return;
 
     const currentTime = this.audioElement.currentTime;
-    const timeDiff = Math.abs(beatTime - currentTime) * 1000; // convert to ms
+    const timeDiff = Math.abs(beatTime - currentTime) * 1000;
 
     let points = 0;
     let accuracy = 'miss';
+    let color = '#ef4444';
 
     if(timeDiff <= this.perfectWindow) {
       points = 50;
       accuracy = 'perfect';
+      color = '#22c55e';
       this.combo++;
     } else if(timeDiff <= this.clickWindow) {
       points = 25;
       accuracy = 'good';
+      color = '#06b6d4';
       this.combo++;
     } else {
       points = 0;
       accuracy = 'miss';
+      color = '#ef4444';
       this.combo = 0;
     }
 
     this.score += points;
     beatEl.classList.add('hit');
-    beatEl.style.background = accuracy === 'perfect' ? 'radial-gradient(circle, #22c55e, #15803d)' : 
-                             accuracy === 'good' ? 'radial-gradient(circle, #06b6d4, #0891b2)' : 
-                             'radial-gradient(circle, #ef4444, #991b1b)';
-    beatEl.style.borderColor = accuracy === 'perfect' ? '#22c55e' : 
-                               accuracy === 'good' ? '#06b6d4' : 
-                               '#ef4444';
+    beatEl.style.borderColor = color;
+    beatEl.style.background = `radial-gradient(circle, ${color}, ${color}22)`;
+    beatEl.style.pointerEvents = 'none';
 
-    // Show feedback
+    // Burst animation
+    this.createBurst(beatEl, color);
+
+    // Show feedback text
     const feedback = document.createElement('div');
     feedback.style.cssText = `
       position: fixed;
       left: 50%;
-      top: 50%;
+      top: 40%;
       transform: translate(-50%, -50%);
       font-weight: bold;
-      font-size: 20px;
+      font-size: 28px;
       pointer-events: none;
       z-index: 999;
-      animation: floatUp 0.8s ease-out forwards;
+      animation: floatUp 1s ease-out forwards;
     `;
     
     if(accuracy === 'perfect') {
-      feedback.textContent = '⭐ PERFECT!';
+      feedback.textContent = '⭐ PERFECT! +50';
       feedback.style.color = '#22c55e';
     } else if(accuracy === 'good') {
-      feedback.textContent = '✨ GOOD!';
+      feedback.textContent = '✨ GOOD! +25';
       feedback.style.color = '#06b6d4';
     } else {
       feedback.textContent = '❌ MISS';
@@ -826,10 +850,55 @@ class RhythmClicker {
     }
 
     document.body.appendChild(feedback);
-    setTimeout(() => feedback.remove(), 800);
+    setTimeout(() => feedback.remove(), 1000);
 
     this.updateUI();
-    setTimeout(() => beatEl.remove(), 500);
+  }
+
+  createBurst(beatEl, color) {
+    const rect = beatEl.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+
+    for(let i = 0; i < 8; i++) {
+      const particle = document.createElement('div');
+      const angle = (i / 8) * Math.PI * 2;
+      const vx = Math.cos(angle) * 150;
+      const vy = Math.sin(angle) * 150;
+
+      particle.style.cssText = `
+        position: fixed;
+        left: ${centerX}px;
+        top: ${centerY}px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: ${color};
+        pointer-events: none;
+        z-index: 998;
+      `;
+      document.body.appendChild(particle);
+
+      let duration = 0;
+      let x = centerX;
+      let y = centerY;
+
+      const animate = () => {
+        duration += 16;
+        x += vx * 0.016;
+        y += vy * 0.016;
+        particle.style.left = x + 'px';
+        particle.style.top = y + 'px';
+        particle.style.opacity = 1 - (duration / 400);
+
+        if(duration < 400) {
+          requestAnimationFrame(animate);
+        } else {
+          particle.remove();
+        }
+      };
+      animate();
+    }
   }
 
   updateUI() {
@@ -837,7 +906,14 @@ class RhythmClicker {
     const comboEl = document.getElementById('rhythmCombo');
     
     if(scoreEl) scoreEl.textContent = this.score;
-    if(comboEl) comboEl.textContent = this.combo;
+    if(comboEl) {
+      comboEl.textContent = this.combo;
+      if(this.combo > 0) {
+        comboEl.style.color = '#22c55e';
+      } else {
+        comboEl.style.color = '#06b6d4';
+      }
+    }
   }
 
   showMessage(msg, duration = 2000) {
@@ -846,23 +922,26 @@ class RhythmClicker {
       msgEl.textContent = msg;
       msgEl.style.opacity = '1';
       setTimeout(() => {
-        msgEl.style.opacity = '0.5';
+        if(msgEl) msgEl.style.opacity = '0.5';
       }, duration);
     }
   }
 
   endGame() {
     this.isActive = false;
-    this.showMessage(`🎉 Game Over! Final Score: ${this.score}`);
+    const finalMsg = this.combo > 0 ? `🎉 Game Over! Final Score: ${this.score} | Combo: ${this.combo}` : `Final Score: ${this.score}`;
+    this.showMessage(finalMsg);
   }
 
   reset() {
     this.score = 0;
     this.combo = 0;
-    this.currentBeatIndex = 0;
     this.isActive = false;
     const container = document.getElementById('beatTargets');
-    if(container) container.innerHTML = '';
+    if(container) {
+      container.querySelectorAll('.beat-target').forEach(el => el.remove());
+    }
+    this.visibleBeats.clear();
     this.updateUI();
     this.showMessage('🎵 Ready to start!');
   }
@@ -948,15 +1027,45 @@ style.textContent = `
   }
 
   .beat-target {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(168, 85, 247, 0.7), rgba(168, 85, 247, 0.1));
+    border: 3px solid #a855f7;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    z-index: 50;
+    transition: all 0.06s ease-out;
     box-shadow: 0 0 15px rgba(168, 85, 247, 0.5);
   }
 
   .beat-target:hover {
     box-shadow: 0 0 25px rgba(168, 85, 247, 0.8);
+    transform: translate(-50%, -50%) scale(0.95);
   }
 
   .beat-target.hit {
     pointer-events: none;
+    animation: beatHit 0.4s ease-out forwards;
+  }
+
+  @keyframes beatHit {
+    0% {
+      transform: translate(-50%, -50%) scale(1);
+      opacity: 1;
+    }
+    100% {
+      transform: translate(-50%, -50%) scale(1.3);
+      opacity: 0;
+    }
   }
 
   @keyframes beatPulse {
