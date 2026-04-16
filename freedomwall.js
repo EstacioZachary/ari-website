@@ -266,6 +266,8 @@ clearFormBtn.addEventListener('click', () => {
 });
 
 // ========== LOAD & DISPLAY POSTS ==========
+let postSubscription = null;
+
 async function loadPosts() {
   try {
     postsContainer.innerHTML = '<div class="text-center text-purple-300 py-8"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><p>Loading posts...</p></div>';
@@ -284,16 +286,14 @@ async function loadPosts() {
     if (posts.length === 0) {
       postsContainer.innerHTML = '';
       emptyState.classList.remove('hidden');
-      return;
+    } else {
+      postsContainer.innerHTML = '';
+      emptyState.classList.add('hidden');
+      posts.forEach(post => {
+        const postEl = createPostElement(post);
+        postsContainer.appendChild(postEl);
+      });
     }
-
-    postsContainer.innerHTML = '';
-    emptyState.classList.add('hidden');
-
-    posts.forEach(post => {
-      const postEl = createPostElement(post);
-      postsContainer.appendChild(postEl);
-    });
 
     // Subscribe to real-time changes
     subscribeToPostChanges();
@@ -441,38 +441,66 @@ async function deletePost(postId) {
 
 // ========== REAL-TIME SUBSCRIPTIONS ==========
 function subscribeToPostChanges() {
-  supabase
-    .channel('posts_changes')
+  // Unsubscribe from previous subscription if exists
+  if (postSubscription) {
+    postSubscription.unsubscribe();
+  }
+
+  postSubscription = supabase
+    .channel('posts_changes_' + Date.now())
     .on(
       'postgres_changes',
       {
-        event: '*',
+        event: 'INSERT',
         schema: 'public',
         table: 'posts'
       },
       (payload) => {
-        if (payload.eventType === 'INSERT') {
-          const newPost = payload.new;
+        console.log('New post received:', payload.new);
+        const newPost = payload.new;
+        if (newPost.is_deleted === false) {
           const postEl = createPostElement(newPost);
           postsContainer.insertBefore(postEl, postsContainer.firstChild);
           postCount.textContent = parseInt(postCount.textContent) + 1;
           emptyState.classList.add('hidden');
-        } else if (payload.eventType === 'UPDATE') {
-          const postEl = document.getElementById(`post-${payload.new.id}`);
-          if (postEl) {
-            const newPostEl = createPostElement(payload.new);
-            postEl.replaceWith(newPostEl);
-          }
-        } else if (payload.eventType === 'DELETE') {
-          const postEl = document.getElementById(`post-${payload.old.id}`);
-          if (postEl) {
-            const newPostEl = createPostElement(payload.old);
-            postEl.replaceWith(newPostEl);
-          }
         }
       }
     )
-    .subscribe();
+    .on(
+      'postgres_changes',
+      {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'posts'
+      },
+      (payload) => {
+        console.log('Post updated:', payload.new);
+        const postEl = document.getElementById(`post-${payload.new.id}`);
+        if (postEl) {
+          const newPostEl = createPostElement(payload.new);
+          postEl.replaceWith(newPostEl);
+        }
+      }
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'DELETE',
+        schema: 'public',
+        table: 'posts'
+      },
+      (payload) => {
+        console.log('Post deleted:', payload.old);
+        const postEl = document.getElementById(`post-${payload.old.id}`);
+        if (postEl) {
+          const newPostEl = createPostElement(payload.old);
+          postEl.replaceWith(newPostEl);
+        }
+      }
+    )
+    .subscribe((status) => {
+      console.log('Subscription status:', status);
+    });
 }
 
 // ========== INITIALIZATION ==========
