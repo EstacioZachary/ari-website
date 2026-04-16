@@ -1,10 +1,15 @@
 // ========== SUPABASE CONFIGURATION ==========
-// ⚠️ REPLACE THESE WITH YOUR SUPABASE CREDENTIALS
 const SUPABASE_URL = "https://vcxynradvnlpgnzulrqz.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZjeHlucmFkdm5scGduenVscnF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzNDQ5NjAsImV4cCI6MjA5MTkyMDk2MH0.mlUht7tEIZ0a6mVLpBu3ipoBXpnK82yLnX7ESpK2-a8";
 
 // Initialize Supabase
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ========== HARDCODED CREDENTIALS (localStorage-based) ==========
+const VALID_ACCOUNTS = {
+  'xenith0611@gmail.com': 'P@ssw0rd123!',
+  'shanti.garlitos@gmail.com': 'P@ssw0rd123!'
+};
 
 // ========== DOM ELEMENTS ==========
 const authSection = document.getElementById('authSection');
@@ -35,23 +40,37 @@ const emptyState = document.getElementById('emptyState');
 
 // ========== STATE ==========
 let currentUser = null;
+let currentUserEmail = null;
 let selectedImages = [];
 
-// ========== AUTHENTICATION ==========
+// ========== AUTHENTICATION (localStorage-based) ==========
 async function handleLogin(e) {
   e.preventDefault();
   authError.classList.add('hidden');
   authLoading.classList.remove('hidden');
 
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: loginEmail.value,
-      password: loginPassword.value
-    });
+    const email = loginEmail.value;
+    const password = loginPassword.value;
 
-    if (error) throw error;
+    // Simple validation
+    if (!VALID_ACCOUNTS[email] || VALID_ACCOUNTS[email] !== password) {
+      throw new Error('Invalid email or password');
+    }
 
-    currentUser = data.user;
+    // Store login in localStorage
+    localStorage.setItem('freedomwall_user', JSON.stringify({
+      email: email,
+      username: email.includes('xenith') ? 'You' : 'Ari',
+      loginTime: new Date().toISOString()
+    }));
+
+    currentUserEmail = email;
+    currentUser = {
+      email: email,
+      username: email.includes('xenith') ? 'You' : 'Ari'
+    };
+
     showMainContent();
     loadPosts();
   } catch (error) {
@@ -63,8 +82,9 @@ async function handleLogin(e) {
 
 async function handleLogout() {
   try {
-    await supabase.auth.signOut();
+    localStorage.removeItem('freedomwall_user');
     currentUser = null;
+    currentUserEmail = null;
     selectedImages = [];
     loginForm.reset();
     postForm.reset();
@@ -76,12 +96,13 @@ async function handleLogout() {
   }
 }
 
-async function checkAuthStatus() {
+function checkAuthStatus() {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    currentUser = user;
-    
-    if (user) {
+    const stored = localStorage.getItem('freedomwall_user');
+    if (stored) {
+      const user = JSON.parse(stored);
+      currentUserEmail = user.email;
+      currentUser = user;
       showMainContent();
       loadPosts();
     } else {
@@ -93,19 +114,17 @@ async function checkAuthStatus() {
   }
 }
 
-// ========== UI HELPERS ==========
-function showAuthSection() {
-  authSection.classList.remove('hidden');
-  mainContent.classList.add('hidden');
-}
-
 function showMainContent() {
   authSection.classList.add('hidden');
   mainContent.classList.remove('hidden');
   
   // Display user name
-  const username = currentUser.email.includes('drae') ? 'Drae' : 'Ari';
-  userDisplayName.textContent = username;
+  userDisplayName.textContent = currentUser.username;
+}
+
+function showAuthSection() {
+  authSection.classList.remove('hidden');
+  mainContent.classList.add('hidden');
 }
 
 function showError(container, message) {
@@ -173,7 +192,7 @@ async function uploadImages() {
     const file = selectedImages[i];
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(7);
-    const filename = `${currentUser.id}/${timestamp}-${random}-${file.name}`;
+    const filename = `${currentUserEmail}/${timestamp}-${random}-${file.name}`;
 
     try {
       const { error } = await supabase.storage
@@ -212,13 +231,11 @@ async function handlePostSubmit(e) {
     const imageUrls = await uploadImages();
 
     // Create post
-    const username = currentUser.email.includes('drae') ? 'Drae' : 'Ari';
-    
     const { error } = await supabase
       .from('posts')
       .insert({
-        user_id: currentUser.id,
-        username: username,
+        user_email: currentUserEmail,
+        username: currentUser.username,
         content: postContent.value.trim(),
         image_urls: imageUrls
       });
@@ -286,7 +303,7 @@ async function loadPosts() {
 }
 
 function createPostElement(post) {
-  const isOwnPost = currentUser.id === post.user_id;
+  const isOwnPost = currentUserEmail === post.user_email;
   const createdDate = new Date(post.created_at).toLocaleString();
   const isEdited = post.updated_at && new Date(post.updated_at) > new Date(post.created_at);
   const updatedDate = new Date(post.updated_at).toLocaleString();
@@ -395,7 +412,7 @@ async function editPost(postId, originalContent, username) {
         updated_at: new Date().toISOString()
       })
       .eq('id', postId)
-      .eq('user_id', currentUser.id);
+      .eq('user_email', currentUserEmail);
 
     if (error) throw error;
   } catch (error) {
@@ -414,7 +431,7 @@ async function deletePost(postId) {
         deleted_at: new Date().toISOString()
       })
       .eq('id', postId)
-      .eq('user_id', currentUser.id);
+      .eq('user_email', currentUserEmail);
 
     if (error) throw error;
   } catch (error) {
