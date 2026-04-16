@@ -44,7 +44,7 @@ let currentUserEmail = null;
 let selectedImages = [];
 
 // Pagination
-const POSTS_PER_PAGE = 10;
+const POSTS_PER_PAGE = 4;
 let currentPage = 1;
 let totalPostsCount = 0;
 
