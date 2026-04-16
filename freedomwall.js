@@ -51,6 +51,10 @@ let totalPostsCount = 0;
 // Image Carousel
 let carouselStates = {}; // { postId: currentImageIndex }
 
+// Reactions & Comments
+const EMOJI_OPTIONS = ['❤️', '😂', '😮', '😢', '🔥', '👏', '💜', '✨'];
+let expandedComments = {}; // { postId: true/false }
+
 // ========== AUTHENTICATION (localStorage-based) ==========
 async function handleLogin(e) {
   e.preventDefault();
@@ -397,9 +401,28 @@ function startAutoReload() {
 
 function createPostElement(post) {
   const isOwnPost = currentUserEmail === post.user_email;
-  const createdDate = new Date(post.created_at).toLocaleString();
+  
+  // Format date in local timezone
+  const createdDate = new Date(post.created_at).toLocaleString('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  });
+  
   const isEdited = post.updated_at && new Date(post.updated_at) > new Date(post.created_at);
-  const updatedDate = new Date(post.updated_at).toLocaleString();
+  const updatedDate = new Date(post.updated_at).toLocaleString('en-US', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  });
 
   const postDiv = document.createElement('div');
   postDiv.id = `post-${post.id}`;
@@ -524,6 +547,20 @@ function createPostElement(post) {
     postDiv.appendChild(carouselDiv);
   }
 
+  // Reactions Section
+  const reactionsDiv = document.createElement('div');
+  reactionsDiv.id = `reactions-${post.id}`;
+  reactionsDiv.className = 'flex gap-2 flex-wrap mb-3 pb-3 border-b border-purple-500/30';
+  reactionsDiv.innerHTML = '<div class="text-xs text-purple-300/60">Loading reactions...</div>';
+  postDiv.appendChild(reactionsDiv);
+
+  // Comments Section
+  const commentsDiv = document.createElement('div');
+  commentsDiv.id = `comments-${post.id}`;
+  commentsDiv.className = 'text-sm mb-3';
+  commentsDiv.innerHTML = '<div class="text-xs text-purple-300/60">Loading comments...</div>';
+  postDiv.appendChild(commentsDiv);
+
   // Delete indicator
   if (post.is_deleted && post.deleted_at) {
     const deletedDiv = document.createElement('div');
@@ -531,6 +568,12 @@ function createPostElement(post) {
     deletedDiv.textContent = `🗑️ This post was deleted on ${new Date(post.deleted_at).toLocaleString()}`;
     postDiv.appendChild(deletedDiv);
   }
+
+  // Load reactions and comments asynchronously
+  setTimeout(async () => {
+    await updateReactionsDisplay(post.id);
+    await updateCommentsDisplay(post.id);
+  }, 100);
 
   return postDiv;
 }
@@ -601,6 +644,293 @@ function updateCarouselDisplay(postId) {
       dot.className = 'w-2 h-2 rounded-full transition bg-purple-300/50';
     }
   });
+}
+
+// ========== REACTIONS ==========
+async function loadReactions(postId) {
+  try {
+    const { data: reactions, error } = await supabase
+      .from('reactions')
+      .select('*')
+      .eq('post_id', postId);
+
+    if (error) throw error;
+
+    // Group reactions by emoji
+    const reactionCounts = {};
+    reactions.forEach(reaction => {
+      if (!reactionCounts[reaction.emoji]) {
+        reactionCounts[reaction.emoji] = [];
+      }
+      reactionCounts[reaction.emoji].push(reaction.user_email);
+    });
+
+    return reactionCounts;
+  } catch (error) {
+    console.error('Failed to load reactions:', error);
+    return {};
+  }
+}
+
+async function addReaction(postId, emoji) {
+  try {
+    const { error } = await supabase
+      .from('reactions')
+      .insert({
+        post_id: postId,
+        user_email: currentUserEmail,
+        username: currentUser.username,
+        emoji: emoji
+      });
+
+    if (error && !error.message.includes('duplicate')) throw error;
+
+    // Reload reactions display
+    const post = document.getElementById(`post-${postId}`);
+    if (post) {
+      await updateReactionsDisplay(postId);
+    }
+  } catch (error) {
+    console.error('Failed to add reaction:', error);
+  }
+}
+
+async function removeReaction(postId, emoji) {
+  try {
+    const { error } = await supabase
+      .from('reactions')
+      .delete()
+      .eq('post_id', postId)
+      .eq('user_email', currentUserEmail)
+      .eq('emoji', emoji);
+
+    if (error) throw error;
+
+    // Reload reactions display
+    await updateReactionsDisplay(postId);
+  } catch (error) {
+    console.error('Failed to remove reaction:', error);
+  }
+}
+
+async function updateReactionsDisplay(postId) {
+  const reactionsContainer = document.getElementById(`reactions-${postId}`);
+  if (!reactionsContainer) return;
+
+  const reactionCounts = await loadReactions(postId);
+  
+  reactionsContainer.innerHTML = '';
+
+  if (Object.keys(reactionCounts).length === 0) {
+    reactionsContainer.innerHTML = '<p class="text-xs text-purple-300/60">No reactions yet</p>';
+    return;
+  }
+
+  // Show each reaction as a button
+  Object.entries(reactionCounts).forEach(([emoji, userEmails]) => {
+    const userReacted = userEmails.includes(currentUserEmail);
+    const btn = document.createElement('button');
+    btn.className = `reaction-btn px-2 py-1 rounded text-sm transition ${
+      userReacted 
+        ? 'bg-pink-600/60 text-pink-100' 
+        : 'bg-purple-700/40 hover:bg-purple-600 text-purple-200'
+    }`;
+    btn.innerHTML = `${emoji} ${userEmails.length}`;
+    btn.onclick = () => {
+      if (userReacted) {
+        removeReaction(postId, emoji);
+      } else {
+        addReaction(postId, emoji);
+      }
+    };
+    reactionsContainer.appendChild(btn);
+  });
+
+  // Add reaction picker button
+  const addBtn = document.createElement('button');
+  addBtn.className = 'px-2 py-1 rounded text-sm bg-purple-700/40 hover:bg-purple-600 text-purple-200 transition';
+  addBtn.innerHTML = '<i class="fas fa-plus"></i>';
+  addBtn.onclick = (e) => showEmojiPicker(postId, e);
+  reactionsContainer.appendChild(addBtn);
+}
+
+function showEmojiPicker(postId, event) {
+  event.stopPropagation();
+  
+  const picker = document.createElement('div');
+  picker.className = 'absolute bg-black/90 border border-purple-500/50 rounded-lg p-2 flex gap-1 z-40';
+  picker.style.top = event.target.offsetTop - 40 + 'px';
+  picker.style.left = event.target.offsetLeft + 'px';
+  
+  EMOJI_OPTIONS.forEach(emoji => {
+    const btn = document.createElement('button');
+    btn.textContent = emoji;
+    btn.className = 'text-xl hover:scale-125 transition cursor-pointer';
+    btn.onclick = () => {
+      addReaction(postId, emoji);
+      picker.remove();
+    };
+    picker.appendChild(btn);
+  });
+
+  document.body.appendChild(picker);
+  
+  setTimeout(() => {
+    document.addEventListener('click', function removePickerOnClickOutside(e) {
+      if (!picker.contains(e.target)) {
+        picker.remove();
+        document.removeEventListener('click', removePickerOnClickOutside);
+      }
+    });
+  }, 0);
+}
+
+// ========== COMMENTS ==========
+async function loadComments(postId) {
+  try {
+    const { data: comments, error } = await supabase
+      .from('comments')
+      .select('*')
+      .eq('post_id', postId)
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return comments || [];
+  } catch (error) {
+    console.error('Failed to load comments:', error);
+    return [];
+  }
+}
+
+async function addComment(postId, content) {
+  try {
+    const { error } = await supabase
+      .from('comments')
+      .insert({
+        post_id: postId,
+        user_email: currentUserEmail,
+        username: currentUser.username,
+        content: content
+      });
+
+    if (error) throw error;
+
+    // Reload comments display
+    await updateCommentsDisplay(postId, true);
+  } catch (error) {
+    showError(postError, `Failed to add comment: ${error.message}`);
+  }
+}
+
+async function deleteComment(commentId, postId) {
+  if (!confirm('Delete this comment?')) return;
+
+  try {
+    const { error } = await supabase
+      .from('comments')
+      .update({ is_deleted: true })
+      .eq('id', commentId);
+
+    if (error) throw error;
+
+    // Reload comments
+    await updateCommentsDisplay(postId);
+  } catch (error) {
+    showError(postError, `Failed to delete comment: ${error.message}`);
+  }
+}
+
+async function updateCommentsDisplay(postId, expand = false) {
+  const commentsContainer = document.getElementById(`comments-${postId}`);
+  if (!commentsContainer) return;
+
+  const comments = await loadComments(postId);
+  const isExpanded = expandedComments[postId] || expand;
+
+  commentsContainer.innerHTML = '';
+
+  if (comments.length === 0) {
+    commentsContainer.innerHTML = '<p class="text-xs text-purple-300/60">No comments yet</p>';
+    return;
+  }
+
+  // Show comment count + expand button
+  const header = document.createElement('div');
+  header.className = 'flex justify-between items-center mb-2';
+  header.innerHTML = `
+    <span class="text-xs text-purple-300">${comments.length} ${comments.length === 1 ? 'comment' : 'comments'}</span>
+    <button 
+      onclick="toggleComments(${postId})"
+      class="text-xs text-purple-400 hover:text-purple-300 transition"
+    >
+      ${isExpanded ? '▼ Hide' : '▶ Show'}
+    </button>
+  `;
+  commentsContainer.appendChild(header);
+
+  if (isExpanded) {
+    // Show all comments
+    comments.forEach(comment => {
+      const commentEl = document.createElement('div');
+      commentEl.className = 'bg-black/40 border border-purple-500/30 rounded p-2 mb-2 text-sm';
+      commentEl.innerHTML = `
+        <div class="flex justify-between items-start mb-1">
+          <span class="font-semibold text-purple-200">${comment.username}</span>
+          ${comment.user_email === currentUserEmail ? `
+            <button 
+              onclick="deleteComment(${comment.id}, ${postId})"
+              class="text-xs text-red-400 hover:text-red-300 transition"
+            >
+              ✕
+            </button>
+          ` : ''}
+        </div>
+        <p class="text-purple-100">${comment.content}</p>
+        <span class="text-xs text-purple-400">${new Date(comment.created_at).toLocaleString('en-US', {
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        })}</span>
+      `;
+      commentsContainer.appendChild(commentEl);
+    });
+
+    // Comment input
+    const inputDiv = document.createElement('div');
+    inputDiv.className = 'mt-2 flex gap-2';
+    inputDiv.innerHTML = `
+      <input 
+        type="text"
+        placeholder="Add a comment..."
+        class="flex-1 bg-black/30 border border-purple-500/50 rounded px-2 py-1 text-xs text-white placeholder-purple-400/50 focus:outline-none focus:border-purple-300"
+        id="comment-input-${postId}"
+        onkeypress="if(event.key==='Enter') addCommentFromInput(${postId})"
+      >
+      <button 
+        onclick="addCommentFromInput(${postId})"
+        class="bg-pink-600/60 hover:bg-pink-600 px-2 py-1 rounded text-xs transition text-white"
+      >
+        Post
+      </button>
+    `;
+    commentsContainer.appendChild(inputDiv);
+  }
+}
+
+function toggleComments(postId) {
+  expandedComments[postId] = !expandedComments[postId];
+  updateCommentsDisplay(postId);
+}
+
+function addCommentFromInput(postId) {
+  const input = document.getElementById(`comment-input-${postId}`);
+  if (!input || !input.value.trim()) return;
+
+  addComment(postId, input.value);
+  input.value = '';
 }
 
 async function editPost(postId, originalContent, username) {
