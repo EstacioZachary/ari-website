@@ -721,11 +721,6 @@ async function updateReactionsDisplay(postId) {
   
   reactionsContainer.innerHTML = '';
 
-  if (Object.keys(reactionCounts).length === 0) {
-    reactionsContainer.innerHTML = '<p class="text-xs text-purple-300/60">No reactions yet</p>';
-    return;
-  }
-
   // Show each reaction as a button
   Object.entries(reactionCounts).forEach(([emoji, userEmails]) => {
     const userReacted = userEmails.includes(currentUserEmail);
@@ -746,7 +741,7 @@ async function updateReactionsDisplay(postId) {
     reactionsContainer.appendChild(btn);
   });
 
-  // Add reaction picker button
+  // Always add reaction picker button
   const addBtn = document.createElement('button');
   addBtn.className = 'px-2 py-1 rounded text-sm bg-purple-700/40 hover:bg-purple-600 text-purple-200 transition';
   addBtn.innerHTML = '<i class="fas fa-plus"></i>';
@@ -850,11 +845,6 @@ async function updateCommentsDisplay(postId, expand = false) {
 
   commentsContainer.innerHTML = '';
 
-  if (comments.length === 0) {
-    commentsContainer.innerHTML = '<p class="text-xs text-purple-300/60">No comments yet</p>';
-    return;
-  }
-
   // Show comment count + expand button
   const header = document.createElement('div');
   header.className = 'flex justify-between items-center mb-2';
@@ -917,6 +907,12 @@ async function updateCommentsDisplay(postId, expand = false) {
       </button>
     `;
     commentsContainer.appendChild(inputDiv);
+  } else if (comments.length === 0) {
+    // Show "no comments" with easy way to add one
+    const emptyMsg = document.createElement('div');
+    emptyMsg.className = 'text-xs text-purple-300/60 py-2';
+    emptyMsg.textContent = 'Be the first to comment!';
+    commentsContainer.appendChild(emptyMsg);
   }
 }
 
