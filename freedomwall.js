@@ -43,6 +43,14 @@ let currentUser = null;
 let currentUserEmail = null;
 let selectedImages = [];
 
+// Pagination
+const POSTS_PER_PAGE = 10;
+let currentPage = 1;
+let totalPostsCount = 0;
+
+// Image Carousel
+let carouselStates = {}; // { postId: currentImageIndex }
+
 // ========== AUTHENTICATION (localStorage-based) ==========
 async function handleLogin(e) {
   e.preventDefault();
@@ -61,14 +69,14 @@ async function handleLogin(e) {
     // Store login in localStorage
     localStorage.setItem('freedomwall_user', JSON.stringify({
       email: email,
-      username: email.includes('xenith') ? 'Xenith' : 'Ari',
+      username: email.includes('xenith') ? 'Drae' : 'Ari',
       loginTime: new Date().toISOString()
     }));
 
     currentUserEmail = email;
     currentUser = {
       email: email,
-      username: email.includes('xenith') ? 'Xenith' : 'Ari'
+      username: email.includes('xenith') ? 'Drae' : 'Ari'
     };
 
     showMainContent();
@@ -273,32 +281,52 @@ clearFormBtn.addEventListener('click', () => {
 let postSubscription = null;
 let autoReloadInterval = null;
 
-async function loadPosts() {
+async function loadPosts(page = 1) {
   try {
+    currentPage = page;
     postsContainer.innerHTML = '<div class="text-center text-purple-300 py-8"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><p>Loading posts...</p></div>';
     emptyState.classList.add('hidden');
 
+    // Get total count first
+    const { count, error: countError } = await supabase
+      .from('posts')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_deleted', false);
+
+    if (countError) throw countError;
+    totalPostsCount = count || 0;
+
+    // Calculate offset for pagination
+    const offset = (page - 1) * POSTS_PER_PAGE;
+
+    // Get paginated posts
     const { data: posts, error } = await supabase
       .from('posts')
       .select('*')
       .eq('is_deleted', false)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .range(offset, offset + POSTS_PER_PAGE - 1);
 
     if (error) throw error;
 
-    postCount.textContent = posts.length;
+    postCount.textContent = totalPostsCount;
 
-    if (posts.length === 0) {
+    if (posts.length === 0 && page === 1) {
       postsContainer.innerHTML = '';
       emptyState.classList.remove('hidden');
-    } else {
-      postsContainer.innerHTML = '';
-      emptyState.classList.add('hidden');
-      posts.forEach(post => {
-        const postEl = createPostElement(post);
-        postsContainer.appendChild(postEl);
-      });
+      return;
     }
+
+    postsContainer.innerHTML = '';
+    emptyState.classList.add('hidden');
+    
+    posts.forEach(post => {
+      const postEl = createPostElement(post);
+      postsContainer.appendChild(postEl);
+    });
+
+    // Add pagination controls
+    addPaginationControls();
 
     // Start auto-reload for real-time effect
     startAutoReload();
@@ -307,40 +335,64 @@ async function loadPosts() {
   }
 }
 
+function addPaginationControls() {
+  const totalPages = Math.ceil(totalPostsCount / POSTS_PER_PAGE);
+  
+  if (totalPages <= 1) return; // No pagination needed
+
+  const paginationDiv = document.createElement('div');
+  paginationDiv.className = 'flex justify-center items-center gap-3 mt-6 mb-4';
+  paginationDiv.innerHTML = `
+    <button 
+      id="prevPageBtn"
+      onclick="loadPosts(${currentPage - 1})"
+      class="px-4 py-2 bg-purple-600/60 hover:bg-purple-600 text-white rounded-lg transition ${currentPage === 1 ? 'opacity-50 cursor-not-allowed' : ''}"
+      ${currentPage === 1 ? 'disabled' : ''}
+    >
+      <i class="fas fa-chevron-left mr-2"></i> Previous
+    </button>
+    
+    <span class="text-purple-200 text-sm">
+      Page <span class="font-bold">${currentPage}</span> of <span class="font-bold">${totalPages}</span>
+    </span>
+    
+    <button 
+      id="nextPageBtn"
+      onclick="loadPosts(${currentPage + 1})"
+      class="px-4 py-2 bg-purple-600/60 hover:bg-purple-600 text-white rounded-lg transition ${currentPage === totalPages ? 'opacity-50 cursor-not-allowed' : ''}"
+      ${currentPage === totalPages ? 'disabled' : ''}
+    >
+      Next <i class="fas fa-chevron-right ml-2"></i>
+    </button>
+  `;
+  
+  postsContainer.appendChild(paginationDiv);
+}
+
 // Auto-reload posts every 3 seconds for real-time effect
 function startAutoReload() {
   if (autoReloadInterval) clearInterval(autoReloadInterval);
   
   autoReloadInterval = setInterval(async () => {
     try {
-      const { data: posts, error } = await supabase
-        .from('posts')
-        .select('*')
-        .eq('is_deleted', false)
-        .order('created_at', { ascending: false });
+      // Just check if count changed on the first page
+      if (currentPage === 1) {
+        const { count, error: countError } = await supabase
+          .from('posts')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_deleted', false);
 
-      if (error) throw error;
+        if (countError) throw countError;
 
-      // Check if post count changed or content changed
-      const currentCount = postsContainer.querySelectorAll('[id^="post-"]').length;
-      if (posts.length !== currentCount || posts.length === 0) {
-        // Posts changed, refresh display
-        postsContainer.innerHTML = '';
-        posts.forEach(post => {
-          const postEl = createPostElement(post);
-          postsContainer.appendChild(postEl);
-        });
-        postCount.textContent = posts.length;
-        if (posts.length === 0) {
-          emptyState.classList.remove('hidden');
-        } else {
-          emptyState.classList.add('hidden');
+        // Only reload if count actually changed
+        if (count !== totalPostsCount) {
+          loadPosts(1);
         }
       }
     } catch (error) {
       console.error('Auto-reload error:', error);
     }
-  }, 2000); // Reload every 2 seconds
+  }, 2500); // Check every 2.5 seconds
 }
 
 function createPostElement(post) {
@@ -387,25 +439,89 @@ function createPostElement(post) {
   contentDiv.textContent = post.content;
   postDiv.appendChild(contentDiv);
 
-  // Images
+  // Images with Carousel
   if (post.image_urls && post.image_urls.length > 0) {
-    const galleryDiv = document.createElement('div');
-    galleryDiv.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mb-3';
+    const carouselDiv = document.createElement('div');
+    carouselDiv.className = 'mb-3';
+    carouselDiv.id = `carousel-${post.id}`;
     
-    post.image_urls.forEach((url, index) => {
-      const imgContainer = document.createElement('div');
-      imgContainer.className = 'relative group cursor-pointer';
-      imgContainer.innerHTML = `
-        <img 
-          src="${url}" 
-          alt="Memory ${index + 1}" 
-          class="w-full h-24 object-cover rounded-lg border border-purple-500/50 hover:border-pink-400 transition"
-          onclick="openImageModal('${url}')"
-        >
+    // Initialize carousel state
+    if (!carouselStates[post.id]) {
+      carouselStates[post.id] = 0;
+    }
+    
+    if (post.image_urls.length === 1) {
+      // Single image - no carousel needed
+      carouselDiv.innerHTML = `
+        <div class="relative group cursor-pointer">
+          <img 
+            src="${post.image_urls[0]}" 
+            alt="Memory" 
+            class="w-full h-64 object-cover rounded-lg border border-purple-500/50 hover:border-pink-400 transition"
+            onclick="openImageModal('${post.image_urls[0]}')"
+          >
+        </div>
       `;
-      galleryDiv.appendChild(imgContainer);
-    });
-    postDiv.appendChild(galleryDiv);
+    } else {
+      // Multiple images - show carousel
+      carouselDiv.innerHTML = `
+        <div class="relative group">
+          <img 
+            id="carousel-img-${post.id}"
+            src="${post.image_urls[0]}" 
+            alt="Memory" 
+            class="w-full h-64 object-cover rounded-lg border border-purple-500/50 cursor-pointer hover:border-pink-400 transition"
+            data-post-id="${post.id}"
+            onclick="openImageModal(this.src)"
+          >
+          
+          <div class="absolute inset-0 flex items-center justify-between px-3 rounded-lg opacity-0 group-hover:opacity-100 transition">
+            <button 
+              onclick="changeCarouselImage('${post.id}', -1, ${post.image_urls.length})"
+              class="bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition"
+            >
+              <i class="fas fa-chevron-left"></i>
+            </button>
+            <button 
+              onclick="changeCarouselImage('${post.id}', 1, ${post.image_urls.length})"
+              class="bg-black/60 hover:bg-black/80 text-white p-2 rounded-full transition"
+            >
+              <i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
+          
+          <div class="absolute bottom-2 left-0 right-0 flex justify-center gap-1">
+            ${post.image_urls.map((_, idx) => `
+              <div 
+                class="w-2 h-2 rounded-full transition ${idx === 0 ? 'bg-pink-400' : 'bg-purple-300/50'}"
+                data-dot-${post.id}-${idx}
+              ></div>
+            `).join('')}
+          </div>
+          
+          <div class="absolute top-2 right-2 bg-black/60 text-white px-3 py-1 rounded-full text-xs">
+            <span id="counter-${post.id}">1</span> / ${post.image_urls.length}
+          </div>
+        </div>
+        
+        <!-- Image Grid Thumbnails -->
+        <div class="grid grid-cols-5 gap-2 mt-2">
+          ${post.image_urls.map((url, idx) => `
+            <img 
+              src="${url}" 
+              alt="Thumbnail ${idx + 1}"
+              class="w-full h-16 object-cover rounded border border-purple-500/50 cursor-pointer hover:border-pink-400 transition"
+              onclick="setCarouselImage('${post.id}', ${idx}, ${post.image_urls.length})"
+            >
+          `).join('')}
+        </div>
+      `;
+      
+      // Store image URLs in data attribute for the carousel
+      carouselDiv.dataset.imageUrls = JSON.stringify(post.image_urls);
+    }
+    
+    postDiv.appendChild(carouselDiv);
   }
 
   // Delete indicator
@@ -436,6 +552,54 @@ function openImageModal(imageUrl) {
   document.body.appendChild(modal);
   modal.addEventListener('click', (e) => {
     if (e.target === modal) modal.remove();
+  });
+}
+
+function changeCarouselImage(postId, direction, totalImages) {
+  // Update index
+  carouselStates[postId] = carouselStates[postId] || 0;
+  carouselStates[postId] += direction;
+  
+  if (carouselStates[postId] < 0) {
+    carouselStates[postId] = totalImages - 1;
+  } else if (carouselStates[postId] >= totalImages) {
+    carouselStates[postId] = 0;
+  }
+
+  updateCarouselDisplay(postId);
+}
+
+function setCarouselImage(postId, index, totalImages) {
+  carouselStates[postId] = index;
+  updateCarouselDisplay(postId);
+}
+
+function updateCarouselDisplay(postId) {
+  const carouselDiv = document.getElementById(`carousel-${postId}`);
+  if (!carouselDiv) return;
+
+  const imageUrls = JSON.parse(carouselDiv.dataset.imageUrls || '[]');
+  const currentIndex = carouselStates[postId];
+
+  // Update main image
+  const imgEl = document.getElementById(`carousel-img-${postId}`);
+  if (imgEl) {
+    imgEl.src = imageUrls[currentIndex];
+  }
+
+  // Update counter
+  const counter = document.getElementById(`counter-${postId}`);
+  if (counter) {
+    counter.textContent = currentIndex + 1;
+  }
+
+  // Update dots
+  carouselDiv.querySelectorAll('[data-dot-' + postId + '-]')?.forEach((dot, idx) => {
+    if (idx === currentIndex) {
+      dot.className = 'w-2 h-2 rounded-full transition bg-pink-400';
+    } else {
+      dot.className = 'w-2 h-2 rounded-full transition bg-purple-300/50';
+    }
   });
 }
 
