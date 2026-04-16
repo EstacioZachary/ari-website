@@ -402,8 +402,10 @@ function startAutoReload() {
 function createPostElement(post) {
   const isOwnPost = currentUserEmail === post.user_email;
   
-  // Format date in local timezone
-  const createdDate = new Date(post.created_at).toLocaleString('en-US', {
+  // Format date in Manila timezone (GMT+8)
+  const createdDate = new Date(post.created_at);
+  const manilaTime = new Date(createdDate.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  const formattedDate = manilaTime.toLocaleString('en-US', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -414,15 +416,16 @@ function createPostElement(post) {
   });
   
   const isEdited = post.updated_at && new Date(post.updated_at) > new Date(post.created_at);
-  const updatedDate = new Date(post.updated_at).toLocaleString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true
-  });
+  const updatedDate = new Date(new Date(post.updated_at).toLocaleString('en-US', { timeZone: 'Asia/Manila' }))
+    .toLocaleString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
 
   const postDiv = document.createElement('div');
   postDiv.id = `post-${post.id}`;
@@ -565,15 +568,21 @@ function createPostElement(post) {
   if (post.is_deleted && post.deleted_at) {
     const deletedDiv = document.createElement('div');
     deletedDiv.className = 'text-xs text-gray-400 italic border-t border-purple-500/30 pt-2 mt-2';
-    deletedDiv.textContent = `🗑️ This post was deleted on ${new Date(post.deleted_at).toLocaleString()}`;
+    const deletedDate = new Date(new Date(post.deleted_at).toLocaleString('en-US', { timeZone: 'Asia/Manila' }))
+      .toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    deletedDiv.textContent = `🗑️ This post was deleted on ${deletedDate}`;
     postDiv.appendChild(deletedDiv);
   }
 
-  // Load reactions and comments asynchronously
+  // Load reactions and comments asynchronously with error handling
   setTimeout(async () => {
-    await updateReactionsDisplay(post.id);
-    await updateCommentsDisplay(post.id);
-  }, 100);
+    try {
+      await updateReactionsDisplay(post.id);
+      await updateCommentsDisplay(post.id);
+    } catch (error) {
+      console.error('Error loading reactions/comments for post', post.id, ':', error);
+    }
+  }, 50);
 
   return postDiv;
 }
@@ -877,7 +886,7 @@ async function updateCommentsDisplay(postId, expand = false) {
           ` : ''}
         </div>
         <p class="text-purple-100">${comment.content}</p>
-        <span class="text-xs text-purple-400">${new Date(comment.created_at).toLocaleString('en-US', {
+        <span class="text-xs text-purple-400">${new Date(new Date(comment.created_at).toLocaleString('en-US', { timeZone: 'Asia/Manila' })).toLocaleString('en-US', {
           month: '2-digit',
           day: '2-digit',
           hour: '2-digit',
