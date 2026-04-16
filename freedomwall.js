@@ -249,6 +249,11 @@ async function handlePostSubmit(e) {
     imageCount.textContent = 'No images selected';
     charCount.textContent = '0';
 
+    // Reload posts to show new post immediately
+    setTimeout(() => {
+      loadPosts();
+    }, 300);
+
   } catch (error) {
     showError(postError, error.message);
   } finally {
