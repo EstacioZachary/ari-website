@@ -109,6 +109,19 @@ async function handleLogout() {
   }
 }
 
+function togglePasswordVisibility() {
+  const passwordInput = document.getElementById('loginPassword');
+  const toggleBtn = document.getElementById('passwordToggle');
+  
+  if (passwordInput.type === 'password') {
+    passwordInput.type = 'text';
+    toggleBtn.innerHTML = '<i class="fas fa-eye-slash"></i>';
+  } else {
+    passwordInput.type = 'password';
+    toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
+  }
+}
+
 function checkAuthStatus() {
   try {
     const stored = localStorage.getItem('freedomwall_user');
