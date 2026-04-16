@@ -61,14 +61,14 @@ async function handleLogin(e) {
     // Store login in localStorage
     localStorage.setItem('freedomwall_user', JSON.stringify({
       email: email,
-      username: email.includes('xenith') ? 'You' : 'Ari',
+      username: email.includes('xenith') ? 'Xenith' : 'Ari',
       loginTime: new Date().toISOString()
     }));
 
     currentUserEmail = email;
     currentUser = {
       email: email,
-      username: email.includes('xenith') ? 'You' : 'Ari'
+      username: email.includes('xenith') ? 'Xenith' : 'Ari'
     };
 
     showMainContent();
@@ -82,6 +82,7 @@ async function handleLogin(e) {
 
 async function handleLogout() {
   try {
+    if (autoReloadInterval) clearInterval(autoReloadInterval);
     localStorage.removeItem('freedomwall_user');
     currentUser = null;
     currentUserEmail = null;
@@ -242,17 +243,15 @@ async function handlePostSubmit(e) {
 
     if (error) throw error;
 
-    // Clear form
+    // Clear form immediately
     postForm.reset();
     selectedImages = [];
     imagePreview.innerHTML = '';
     imageCount.textContent = 'No images selected';
     charCount.textContent = '0';
 
-    // Reload posts to show new post immediately
-    setTimeout(() => {
-      loadPosts();
-    }, 300);
+    // Reload posts immediately to show new post
+    await loadPosts();
 
   } catch (error) {
     showError(postError, error.message);
@@ -272,6 +271,7 @@ clearFormBtn.addEventListener('click', () => {
 
 // ========== LOAD & DISPLAY POSTS ==========
 let postSubscription = null;
+let autoReloadInterval = null;
 
 async function loadPosts() {
   try {
@@ -300,11 +300,47 @@ async function loadPosts() {
       });
     }
 
-    // Subscribe to real-time changes
-    subscribeToPostChanges();
+    // Start auto-reload for real-time effect
+    startAutoReload();
   } catch (error) {
     showError(postError, `Failed to load posts: ${error.message}`);
   }
+}
+
+// Auto-reload posts every 3 seconds for real-time effect
+function startAutoReload() {
+  if (autoReloadInterval) clearInterval(autoReloadInterval);
+  
+  autoReloadInterval = setInterval(async () => {
+    try {
+      const { data: posts, error } = await supabase
+        .from('posts')
+        .select('*')
+        .eq('is_deleted', false)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Check if post count changed or content changed
+      const currentCount = postsContainer.querySelectorAll('[id^="post-"]').length;
+      if (posts.length !== currentCount || posts.length === 0) {
+        // Posts changed, refresh display
+        postsContainer.innerHTML = '';
+        posts.forEach(post => {
+          const postEl = createPostElement(post);
+          postsContainer.appendChild(postEl);
+        });
+        postCount.textContent = posts.length;
+        if (posts.length === 0) {
+          emptyState.classList.remove('hidden');
+        } else {
+          emptyState.classList.add('hidden');
+        }
+      }
+    } catch (error) {
+      console.error('Auto-reload error:', error);
+    }
+  }, 2000); // Reload every 2 seconds
 }
 
 function createPostElement(post) {
@@ -444,69 +480,7 @@ async function deletePost(postId) {
   }
 }
 
-// ========== REAL-TIME SUBSCRIPTIONS ==========
-function subscribeToPostChanges() {
-  // Unsubscribe from previous subscription if exists
-  if (postSubscription) {
-    postSubscription.unsubscribe();
-  }
 
-  postSubscription = supabase
-    .channel('posts_changes_' + Date.now())
-    .on(
-      'postgres_changes',
-      {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'posts'
-      },
-      (payload) => {
-        console.log('New post received:', payload.new);
-        const newPost = payload.new;
-        if (newPost.is_deleted === false) {
-          const postEl = createPostElement(newPost);
-          postsContainer.insertBefore(postEl, postsContainer.firstChild);
-          postCount.textContent = parseInt(postCount.textContent) + 1;
-          emptyState.classList.add('hidden');
-        }
-      }
-    )
-    .on(
-      'postgres_changes',
-      {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'posts'
-      },
-      (payload) => {
-        console.log('Post updated:', payload.new);
-        const postEl = document.getElementById(`post-${payload.new.id}`);
-        if (postEl) {
-          const newPostEl = createPostElement(payload.new);
-          postEl.replaceWith(newPostEl);
-        }
-      }
-    )
-    .on(
-      'postgres_changes',
-      {
-        event: 'DELETE',
-        schema: 'public',
-        table: 'posts'
-      },
-      (payload) => {
-        console.log('Post deleted:', payload.old);
-        const postEl = document.getElementById(`post-${payload.old.id}`);
-        if (postEl) {
-          const newPostEl = createPostElement(payload.old);
-          postEl.replaceWith(newPostEl);
-        }
-      }
-    )
-    .subscribe((status) => {
-      console.log('Subscription status:', status);
-    });
-}
 
 // ========== INITIALIZATION ==========
 loginForm.addEventListener('submit', handleLogin);
