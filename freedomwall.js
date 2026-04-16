@@ -1,0 +1,512 @@
+// ========== SUPABASE CONFIGURATION ==========
+// ⚠️ REPLACE THESE WITH YOUR SUPABASE CREDENTIALS
+const SUPABASE_URL = "https://vcxynradvnlpgnzulrqz.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_orkGBWEUQKTEtLjgeSvmWA_2lUCRHgq";
+
+// Initialize Supabase
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ========== DOM ELEMENTS ==========
+const authSection = document.getElementById('authSection');
+const mainContent = document.getElementById('mainContent');
+const loginForm = document.getElementById('loginForm');
+const loginEmail = document.getElementById('loginEmail');
+const loginPassword = document.getElementById('loginPassword');
+const authError = document.getElementById('authError');
+const authLoading = document.getElementById('authLoading');
+const logoutBtn = document.getElementById('logoutBtn');
+const userDisplayName = document.getElementById('userDisplayName');
+
+const postForm = document.getElementById('postForm');
+const postContent = document.getElementById('postContent');
+const imageUpload = document.getElementById('imageUpload');
+const imageUploadBtn = document.getElementById('imageUploadBtn');
+const imageCount = document.getElementById('imageCount');
+const imagePreview = document.getElementById('imagePreview');
+const submitPostBtn = document.getElementById('submitPostBtn');
+const clearFormBtn = document.getElementById('clearFormBtn');
+const postError = document.getElementById('postError');
+const postLoading = document.getElementById('postLoading');
+const charCount = document.getElementById('charCount');
+
+const postsContainer = document.getElementById('postsContainer');
+const postCount = document.getElementById('postCount');
+const emptyState = document.getElementById('emptyState');
+
+// ========== STATE ==========
+let currentUser = null;
+let selectedImages = [];
+
+// ========== AUTHENTICATION ==========
+async function handleLogin(e) {
+  e.preventDefault();
+  authError.classList.add('hidden');
+  authLoading.classList.remove('hidden');
+
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: loginEmail.value,
+      password: loginPassword.value
+    });
+
+    if (error) throw error;
+
+    currentUser = data.user;
+    showMainContent();
+    loadPosts();
+  } catch (error) {
+    showError(authError, error.message);
+  } finally {
+    authLoading.classList.add('hidden');
+  }
+}
+
+async function handleLogout() {
+  try {
+    await supabase.auth.signOut();
+    currentUser = null;
+    selectedImages = [];
+    loginForm.reset();
+    postForm.reset();
+    imagePreview.innerHTML = '';
+    postsContainer.innerHTML = '';
+    showAuthSection();
+  } catch (error) {
+    console.error('Logout error:', error);
+  }
+}
+
+async function checkAuthStatus() {
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    currentUser = user;
+    
+    if (user) {
+      showMainContent();
+      loadPosts();
+    } else {
+      showAuthSection();
+    }
+  } catch (error) {
+    console.error('Auth check error:', error);
+    showAuthSection();
+  }
+}
+
+// ========== UI HELPERS ==========
+function showAuthSection() {
+  authSection.classList.remove('hidden');
+  mainContent.classList.add('hidden');
+}
+
+function showMainContent() {
+  authSection.classList.add('hidden');
+  mainContent.classList.remove('hidden');
+  
+  // Display user name
+  const username = currentUser.email.includes('drae') ? 'Drae' : 'Ari';
+  userDisplayName.textContent = username;
+}
+
+function showError(container, message) {
+  container.textContent = message;
+  container.classList.remove('hidden');
+  setTimeout(() => container.classList.add('hidden'), 5000);
+}
+
+// ========== IMAGE HANDLING ==========
+imageUploadBtn.addEventListener('click', () => imageUpload.click());
+
+imageUpload.addEventListener('change', (e) => {
+  selectedImages = Array.from(e.target.files);
+  updateImagePreview();
+});
+
+function updateImagePreview() {
+  imagePreview.innerHTML = '';
+  
+  if (selectedImages.length === 0) {
+    imageCount.textContent = 'No images selected';
+    return;
+  }
+
+  imageCount.textContent = `${selectedImages.length} image(s) selected`;
+
+  selectedImages.forEach((file, index) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const preview = document.createElement('div');
+      preview.className = 'relative group';
+      preview.innerHTML = `
+        <img src="${e.target.result}" alt="preview" class="w-full h-24 object-cover rounded-lg border border-purple-500/50">
+        <button 
+          type="button"
+          onclick="removeImage(${index})"
+          class="absolute top-1 right-1 bg-red-600 hover:bg-red-700 w-6 h-6 rounded-full flex items-center justify-center text-white text-xs opacity-0 group-hover:opacity-100 transition"
+        >
+          ✕
+        </button>
+      `;
+      imagePreview.appendChild(preview);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function removeImage(index) {
+  selectedImages.splice(index, 1);
+  imageUpload.value = '';
+  updateImagePreview();
+}
+
+// ========== POST HANDLING ==========
+postContent.addEventListener('input', (e) => {
+  charCount.textContent = e.target.value.length;
+});
+
+async function uploadImages() {
+  if (selectedImages.length === 0) return [];
+
+  const imageUrls = [];
+
+  for (let i = 0; i < selectedImages.length; i++) {
+    const file = selectedImages[i];
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(7);
+    const filename = `${currentUser.id}/${timestamp}-${random}-${file.name}`;
+
+    try {
+      const { error } = await supabase.storage
+        .from('images')
+        .upload(filename, file);
+
+      if (error) throw error;
+
+      const { data } = supabase.storage
+        .from('images')
+        .getPublicUrl(filename);
+
+      imageUrls.push(data.publicUrl);
+    } catch (error) {
+      showError(postError, `Failed to upload image: ${file.name}`);
+    }
+  }
+
+  return imageUrls;
+}
+
+async function handlePostSubmit(e) {
+  e.preventDefault();
+  
+  if (!postContent.value.trim()) {
+    showError(postError, 'Please write something!');
+    return;
+  }
+
+  postError.classList.add('hidden');
+  postLoading.classList.remove('hidden');
+  submitPostBtn.disabled = true;
+
+  try {
+    // Upload images first
+    const imageUrls = await uploadImages();
+
+    // Create post
+    const username = currentUser.email.includes('drae') ? 'Drae' : 'Ari';
+    
+    const { error } = await supabase
+      .from('posts')
+      .insert({
+        user_id: currentUser.id,
+        username: username,
+        content: postContent.value.trim(),
+        image_urls: imageUrls
+      });
+
+    if (error) throw error;
+
+    // Clear form
+    postForm.reset();
+    selectedImages = [];
+    imagePreview.innerHTML = '';
+    imageCount.textContent = 'No images selected';
+    charCount.textContent = '0';
+
+  } catch (error) {
+    showError(postError, error.message);
+  } finally {
+    postLoading.classList.add('hidden');
+    submitPostBtn.disabled = false;
+  }
+}
+
+clearFormBtn.addEventListener('click', () => {
+  postForm.reset();
+  selectedImages = [];
+  imagePreview.innerHTML = '';
+  imageCount.textContent = 'No images selected';
+  charCount.textContent = '0';
+});
+
+// ========== LOAD & DISPLAY POSTS ==========
+async function loadPosts() {
+  try {
+    postsContainer.innerHTML = '<div class="text-center text-purple-300 py-8"><i class="fas fa-spinner fa-spin text-2xl mb-2"></i><p>Loading posts...</p></div>';
+    emptyState.classList.add('hidden');
+
+    const { data: posts, error } = await supabase
+      .from('posts')
+      .select('*')
+      .eq('is_deleted', false)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    postCount.textContent = posts.length;
+
+    if (posts.length === 0) {
+      postsContainer.innerHTML = '';
+      emptyState.classList.remove('hidden');
+      return;
+    }
+
+    postsContainer.innerHTML = '';
+    emptyState.classList.add('hidden');
+
+    posts.forEach(post => {
+      const postEl = createPostElement(post);
+      postsContainer.appendChild(postEl);
+    });
+
+    // Subscribe to real-time changes
+    subscribeToPostChanges();
+  } catch (error) {
+    showError(postError, `Failed to load posts: ${error.message}`);
+  }
+}
+
+function createPostElement(post) {
+  const isOwnPost = currentUser.id === post.user_id;
+  const createdDate = new Date(post.created_at).toLocaleString();
+  const isEdited = post.updated_at && new Date(post.updated_at) > new Date(post.created_at);
+  const updatedDate = new Date(post.updated_at).toLocaleString();
+
+  const postDiv = document.createElement('div');
+  postDiv.id = `post-${post.id}`;
+  postDiv.className = 'bg-black/30 border border-purple-500/50 rounded-xl p-4 md:p-5';
+
+  // Header
+  const header = document.createElement('div');
+  header.className = 'flex justify-between items-start mb-3 flex-wrap gap-2';
+  header.innerHTML = `
+    <div>
+      <span class="font-bold text-purple-200">${post.username}</span>
+      <span class="text-xs text-purple-400 ml-2">${createdDate}</span>
+      ${isEdited ? `<span class="text-xs text-yellow-400 ml-2"><i class="fas fa-pen"></i> edited ${updatedDate}</span>` : ''}
+    </div>
+    ${isOwnPost ? `
+      <div class="flex gap-2">
+        <button 
+          onclick="editPost(${post.id}, '${post.content.replace(/'/g, "\\'")}', '${post.username}')"
+          class="text-xs bg-blue-600/60 hover:bg-blue-600 px-2 py-1 rounded transition text-blue-100"
+        >
+          <i class="fas fa-edit mr-1"></i> Edit
+        </button>
+        <button 
+          onclick="deletePost(${post.id})"
+          class="text-xs bg-red-600/60 hover:bg-red-600 px-2 py-1 rounded transition text-red-100"
+        >
+          <i class="fas fa-trash mr-1"></i> Delete
+        </button>
+      </div>
+    ` : ''}
+  `;
+  postDiv.appendChild(header);
+
+  // Content
+  const contentDiv = document.createElement('p');
+  contentDiv.className = 'text-purple-100 mb-3 whitespace-pre-wrap break-words';
+  contentDiv.textContent = post.content;
+  postDiv.appendChild(contentDiv);
+
+  // Images
+  if (post.image_urls && post.image_urls.length > 0) {
+    const galleryDiv = document.createElement('div');
+    galleryDiv.className = 'grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mb-3';
+    
+    post.image_urls.forEach((url, index) => {
+      const imgContainer = document.createElement('div');
+      imgContainer.className = 'relative group cursor-pointer';
+      imgContainer.innerHTML = `
+        <img 
+          src="${url}" 
+          alt="Memory ${index + 1}" 
+          class="w-full h-24 object-cover rounded-lg border border-purple-500/50 hover:border-pink-400 transition"
+          onclick="openImageModal('${url}')"
+        >
+      `;
+      galleryDiv.appendChild(imgContainer);
+    });
+    postDiv.appendChild(galleryDiv);
+  }
+
+  // Delete indicator
+  if (post.is_deleted && post.deleted_at) {
+    const deletedDiv = document.createElement('div');
+    deletedDiv.className = 'text-xs text-gray-400 italic border-t border-purple-500/30 pt-2 mt-2';
+    deletedDiv.textContent = `🗑️ This post was deleted on ${new Date(post.deleted_at).toLocaleString()}`;
+    postDiv.appendChild(deletedDiv);
+  }
+
+  return postDiv;
+}
+
+function openImageModal(imageUrl) {
+  const modal = document.createElement('div');
+  modal.className = 'fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+  modal.innerHTML = `
+    <div class="relative max-w-2xl w-full">
+      <img src="${imageUrl}" alt="Full view" class="w-full rounded-lg">
+      <button 
+        onclick="this.closest('.fixed').remove()"
+        class="absolute top-2 right-2 bg-black/50 hover:bg-black/70 w-8 h-8 rounded-full flex items-center justify-center text-white transition"
+      >
+        ✕
+      </button>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', (e) => {
+    if (e.target === modal) modal.remove();
+  });
+}
+
+async function editPost(postId, originalContent, username) {
+  const newContent = prompt(`Edit your thought:\n\n`, originalContent);
+  
+  if (newContent === null || newContent.trim() === '') return;
+  if (newContent.trim() === originalContent) return;
+
+  try {
+    const { error } = await supabase
+      .from('posts')
+      .update({
+        content: newContent.trim(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', postId)
+      .eq('user_id', currentUser.id);
+
+    if (error) throw error;
+  } catch (error) {
+    showError(postError, `Failed to edit post: ${error.message}`);
+  }
+}
+
+async function deletePost(postId) {
+  if (!confirm('Are you sure you want to delete this post? This action is permanent.')) return;
+
+  try {
+    const { error } = await supabase
+      .from('posts')
+      .update({
+        is_deleted: true,
+        deleted_at: new Date().toISOString()
+      })
+      .eq('id', postId)
+      .eq('user_id', currentUser.id);
+
+    if (error) throw error;
+  } catch (error) {
+    showError(postError, `Failed to delete post: ${error.message}`);
+  }
+}
+
+// ========== REAL-TIME SUBSCRIPTIONS ==========
+function subscribeToPostChanges() {
+  supabase
+    .channel('posts_changes')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: 'posts'
+      },
+      (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newPost = payload.new;
+          const postEl = createPostElement(newPost);
+          postsContainer.insertBefore(postEl, postsContainer.firstChild);
+          postCount.textContent = parseInt(postCount.textContent) + 1;
+          emptyState.classList.add('hidden');
+        } else if (payload.eventType === 'UPDATE') {
+          const postEl = document.getElementById(`post-${payload.new.id}`);
+          if (postEl) {
+            const newPostEl = createPostElement(payload.new);
+            postEl.replaceWith(newPostEl);
+          }
+        } else if (payload.eventType === 'DELETE') {
+          const postEl = document.getElementById(`post-${payload.old.id}`);
+          if (postEl) {
+            const newPostEl = createPostElement(payload.old);
+            postEl.replaceWith(newPostEl);
+          }
+        }
+      }
+    )
+    .subscribe();
+}
+
+// ========== INITIALIZATION ==========
+loginForm.addEventListener('submit', handleLogin);
+logoutBtn.addEventListener('click', handleLogout);
+postForm.addEventListener('submit', handlePostSubmit);
+
+// Check if user is already logged in
+checkAuthStatus();
+
+// ========== PETAL SYSTEM (Copied from app.js) ==========
+const petalField = document.getElementById('petal-field');
+let activePetals = [];
+const petalIcons = ['fas fa-flower', 'fas fa-fan', 'fas fa-seedling', 'fas fa-feather-alt', 'fas fa-heart', 'fas fa-crown', 'fas fa-gem', 'fas fa-moon', 'fas fa-star'];
+
+function createPetal(x = null, y = null) {
+  const randIcon = petalIcons[Math.floor(Math.random() * petalIcons.length)];
+  const petal = document.createElement('i');
+  petal.className = `${randIcon} petal`;
+  const size = Math.floor(Math.random() * 22) + 18;
+  petal.style.fontSize = size + 'px';
+  const hue = 260 + Math.random() * 35;
+  petal.style.color = `hsl(${hue}, 75%, 68%)`;
+  petal.style.opacity = 0.5 + Math.random() * 0.3;
+  petal.style.position = 'fixed';
+  petal.style.pointerEvents = 'none';
+  petal.style.zIndex = 5;
+  petal.style.willChange = 'transform';
+
+  const posX = (x !== null) ? x : Math.random() * window.innerWidth;
+  const posY = (y !== null) ? y : Math.random() * window.innerHeight;
+  petal.style.left = posX + 'px';
+  petal.style.top = posY + 'px';
+
+  const duration = 15 + Math.random() * 10;
+  petal.style.animation = `floatPetals ${duration}s ease-in-out infinite`;
+  petal.style.transform = `rotate(${Math.random() * 360}deg)`;
+
+  petalField.appendChild(petal);
+  activePetals.push(petal);
+
+  setTimeout(() => {
+    if (petal && petal.parentNode) {
+      petal.remove();
+      const idx = activePetals.indexOf(petal);
+      if (idx !== -1) activePetals.splice(idx, 1);
+    }
+  }, (duration + 1) * 1000);
+}
+
+// Create petals occasionally
+setInterval(() => {
+  if (Math.random() > 0.7) createPetal();
+}, 800);
