@@ -403,9 +403,8 @@ function createPostElement(post) {
   const isOwnPost = currentUserEmail === post.user_email;
   
   // Format date in Manila timezone (GMT+8)
-  const createdDate = new Date(post.created_at);
-  const manilaTime = new Date(createdDate.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-  const formattedDate = manilaTime.toLocaleString('en-US', {
+  const createdDate = new Date(post.created_at).toLocaleString('en-US', {
+    timeZone: 'Asia/Manila',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -416,16 +415,16 @@ function createPostElement(post) {
   });
   
   const isEdited = post.updated_at && new Date(post.updated_at) > new Date(post.created_at);
-  const updatedDate = new Date(new Date(post.updated_at).toLocaleString('en-US', { timeZone: 'Asia/Manila' }))
-    .toLocaleString('en-US', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
-    });
+  const updatedDate = new Date(post.updated_at).toLocaleString('en-US', {
+    timeZone: 'Asia/Manila',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  });
 
   const postDiv = document.createElement('div');
   postDiv.id = `post-${post.id}`;
@@ -568,8 +567,16 @@ function createPostElement(post) {
   if (post.is_deleted && post.deleted_at) {
     const deletedDiv = document.createElement('div');
     deletedDiv.className = 'text-xs text-gray-400 italic border-t border-purple-500/30 pt-2 mt-2';
-    const deletedDate = new Date(new Date(post.deleted_at).toLocaleString('en-US', { timeZone: 'Asia/Manila' }))
-      .toLocaleString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+    const deletedDate = new Date(post.deleted_at).toLocaleString('en-US', {
+      timeZone: 'Asia/Manila',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
     deletedDiv.textContent = `🗑️ This post was deleted on ${deletedDate}`;
     postDiv.appendChild(deletedDiv);
   }
@@ -760,33 +767,49 @@ async function updateReactionsDisplay(postId) {
 
 function showEmojiPicker(postId, event) {
   event.stopPropagation();
+  event.preventDefault();
+  
+  // Remove existing picker if any
+  const existingPicker = document.querySelector('[data-emoji-picker]');
+  if (existingPicker) {
+    existingPicker.remove();
+  }
   
   const picker = document.createElement('div');
-  picker.className = 'absolute bg-black/90 border border-purple-500/50 rounded-lg p-2 flex gap-1 z-40';
-  picker.style.top = event.target.offsetTop - 40 + 'px';
-  picker.style.left = event.target.offsetLeft + 'px';
+  picker.setAttribute('data-emoji-picker', 'true');
+  picker.className = 'fixed bg-black/95 border border-pink-500/70 rounded-lg p-3 flex gap-2 z-50 shadow-lg';
+  
+  // Position picker above the button
+  const buttonRect = event.target.getBoundingClientRect();
+  picker.style.left = buttonRect.left + 'px';
+  picker.style.top = (buttonRect.top - 60) + 'px';
   
   EMOJI_OPTIONS.forEach(emoji => {
     const btn = document.createElement('button');
     btn.textContent = emoji;
-    btn.className = 'text-xl hover:scale-125 transition cursor-pointer';
-    btn.onclick = () => {
+    btn.className = 'text-2xl hover:scale-150 hover:text-pink-300 transition cursor-pointer p-1';
+    btn.type = 'button';
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      e.preventDefault();
       addReaction(postId, emoji);
       picker.remove();
     };
+    btn.onmousedown = (e) => e.preventDefault();
     picker.appendChild(btn);
   });
 
   document.body.appendChild(picker);
   
-  setTimeout(() => {
-    document.addEventListener('click', function removePickerOnClickOutside(e) {
-      if (!picker.contains(e.target)) {
-        picker.remove();
-        document.removeEventListener('click', removePickerOnClickOutside);
-      }
-    });
-  }, 0);
+  // Close picker when clicking outside
+  const handleClickOutside = (e) => {
+    if (!picker.contains(e.target) && !e.target.closest('[onclick*="showEmojiPicker"]')) {
+      picker.remove();
+      document.removeEventListener('click', handleClickOutside);
+    }
+  };
+  
+  document.addEventListener('click', handleClickOutside);
 }
 
 // ========== COMMENTS ==========
@@ -886,7 +909,8 @@ async function updateCommentsDisplay(postId, expand = false) {
           ` : ''}
         </div>
         <p class="text-purple-100">${comment.content}</p>
-        <span class="text-xs text-purple-400">${new Date(new Date(comment.created_at).toLocaleString('en-US', { timeZone: 'Asia/Manila' })).toLocaleString('en-US', {
+        <span class="text-xs text-purple-400">${new Date(comment.created_at).toLocaleString('en-US', {
+          timeZone: 'Asia/Manila',
           month: '2-digit',
           day: '2-digit',
           hour: '2-digit',
