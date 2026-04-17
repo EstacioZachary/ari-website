@@ -415,9 +415,8 @@ function startAutoReload() {
 function createPostElement(post) {
   const isOwnPost = currentUserEmail === post.user_email;
   
-  // Format date in Manila timezone (GMT+8)
+  // Format dates using browser's local timezone (user's system timezone)
   const createdDate = new Date(post.created_at).toLocaleString('en-US', {
-    timeZone: 'Asia/Manila',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -429,7 +428,6 @@ function createPostElement(post) {
   
   const isEdited = post.updated_at && new Date(post.updated_at) > new Date(post.created_at);
   const updatedDate = new Date(post.updated_at).toLocaleString('en-US', {
-    timeZone: 'Asia/Manila',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
@@ -455,13 +453,15 @@ function createPostElement(post) {
     ${isOwnPost ? `
       <div class="flex gap-2">
         <button 
-          onclick="editPost(${post.id}, '${post.content.replace(/'/g, "\\'")}', '${post.username}')"
+          data-edit-post-id="${post.id}"
+          onclick="openEditModal(this)"
           class="text-xs bg-blue-600/60 hover:bg-blue-600 px-2 py-1 rounded transition text-blue-100"
         >
           <i class="fas fa-edit mr-1"></i> Edit
         </button>
         <button 
-          onclick="deletePost(${post.id})"
+          data-delete-post-id="${post.id}"
+          onclick="openDeleteModal(this)"
           class="text-xs bg-red-600/60 hover:bg-red-600 px-2 py-1 rounded transition text-red-100"
         >
           <i class="fas fa-trash mr-1"></i> Delete
@@ -581,7 +581,6 @@ function createPostElement(post) {
     const deletedDiv = document.createElement('div');
     deletedDiv.className = 'text-xs text-gray-400 italic border-t border-purple-500/30 pt-2 mt-2';
     const deletedDate = new Date(post.deleted_at).toLocaleString('en-US', {
-      timeZone: 'Asia/Manila',
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
@@ -923,7 +922,6 @@ async function updateCommentsDisplay(postId, expand = false) {
         </div>
         <p class="text-purple-100">${comment.content}</p>
         <span class="text-xs text-purple-400">${new Date(comment.created_at).toLocaleString('en-US', {
-          timeZone: 'Asia/Manila',
           month: '2-digit',
           day: '2-digit',
           hour: '2-digit',
@@ -975,31 +973,69 @@ function addCommentFromInput(postId) {
   input.value = '';
 }
 
-async function editPost(postId, originalContent, username) {
-  const newContent = prompt(`Edit your thought:\n\n`, originalContent);
-  
-  if (newContent === null || newContent.trim() === '') return;
-  if (newContent.trim() === originalContent) return;
+// ========== MODALS ==========
+let editingPostId = null;
+let deletingPostId = null;
 
+// Edit Modal
+async function openEditModal(button) {
+  const postId = button.dataset.editPostId;
+  const postElement = document.getElementById(`post-${postId}`);
+  const contentElement = postElement.querySelector('p');
+  
+  editingPostId = postId;
+  const editTextarea = document.getElementById('editTextarea');
+  editTextarea.value = contentElement.textContent;
+  editTextarea.oninput = () => {
+    document.getElementById('editCharCount').textContent = editTextarea.value.length;
+  };
+  document.getElementById('editCharCount').textContent = editTextarea.value.length;
+  document.getElementById('editModal').classList.remove('hidden');
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').classList.add('hidden');
+  editingPostId = null;
+}
+
+async function saveEdit() {
+  if (!editingPostId) return;
+  
+  const newContent = document.getElementById('editTextarea').value.trim();
+  if (!newContent) return;
+  
   try {
     const { error } = await supabase
       .from('posts')
       .update({
-        content: newContent.trim(),
+        content: newContent,
         updated_at: new Date().toISOString()
       })
-      .eq('id', postId)
+      .eq('id', editingPostId)
       .eq('user_email', currentUserEmail);
 
     if (error) throw error;
+    closeEditModal();
+    await loadPosts();
   } catch (error) {
     showError(postError, `Failed to edit post: ${error.message}`);
   }
 }
 
-async function deletePost(postId) {
-  if (!confirm('Are you sure you want to delete this post? This action is permanent.')) return;
+// Delete Modal
+function openDeleteModal(button) {
+  deletingPostId = button.dataset.deletePostId;
+  document.getElementById('deleteModal').classList.remove('hidden');
+}
 
+function closeDeleteModal() {
+  document.getElementById('deleteModal').classList.add('hidden');
+  deletingPostId = null;
+}
+
+async function confirmDelete() {
+  if (!deletingPostId) return;
+  
   try {
     const { error } = await supabase
       .from('posts')
@@ -1007,20 +1043,49 @@ async function deletePost(postId) {
         is_deleted: true,
         deleted_at: new Date().toISOString()
       })
-      .eq('id', postId)
+      .eq('id', deletingPostId)
       .eq('user_email', currentUserEmail);
 
     if (error) throw error;
+    closeDeleteModal();
+    await loadPosts();
   } catch (error) {
     showError(postError, `Failed to delete post: ${error.message}`);
   }
 }
 
+// Logout Modal
+function openLogoutModalHandler() {
+  document.getElementById('logoutModal').classList.remove('hidden');
+}
 
+function closeLogoutModal() {
+  document.getElementById('logoutModal').classList.add('hidden');
+}
+
+async function confirmLogout() {
+  await handleLogout();
+  closeLogoutModal();
+}
+
+
+
+// Close modals when clicking outside
+document.getElementById('editModal').addEventListener('click', (e) => {
+  if (e.target.id === 'editModal') closeEditModal();
+});
+
+document.getElementById('deleteModal').addEventListener('click', (e) => {
+  if (e.target.id === 'deleteModal') closeDeleteModal();
+});
+
+document.getElementById('logoutModal').addEventListener('click', (e) => {
+  if (e.target.id === 'logoutModal') closeLogoutModal();
+});
 
 // ========== INITIALIZATION ==========
 loginForm.addEventListener('submit', handleLogin);
-logoutBtn.addEventListener('click', handleLogout);
+logoutBtn.addEventListener('click', openLogoutModalHandler);
 postForm.addEventListener('submit', handlePostSubmit);
 
 // Check if user is already logged in
