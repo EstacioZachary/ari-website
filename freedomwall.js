@@ -58,16 +58,22 @@ let expandedComments = {}; // { postId: true/false }
 // ========== TIMEZONE DETECTION & FORMATTING ==========
 function getUserTimezone() {
   try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    console.log('🌍 Detected timezone:', detected);
+    // For Philippines, use Asia/Manila as the standard timezone
+    if (detected.includes('Manila') || detected.includes('Taipei') || detected.includes('Hong_Kong')) {
+      return 'Asia/Manila';
+    }
+    return detected;
   } catch (error) {
-    console.warn('Could not detect timezone, defaulting to UTC');
-    return 'UTC';
+    console.warn('Could not detect timezone, using Asia/Manila as default');
+    return 'Asia/Manila'; // Default to Manila for this website
   }
 }
 
 function formatDateWithUserTimezone(date) {
   const userTimezone = getUserTimezone();
-  return new Date(date).toLocaleString('en-US', {
+  const formatted = new Date(date).toLocaleString('en-US', {
     timeZone: userTimezone,
     year: 'numeric',
     month: '2-digit',
@@ -77,6 +83,8 @@ function formatDateWithUserTimezone(date) {
     second: '2-digit',
     hour12: true
   });
+  console.log('📅 Date formatting:', { original: date, userTimezone, formatted });
+  return formatted;
 }
 
 function formatDateShortWithUserTimezone(date) {
