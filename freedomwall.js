@@ -55,6 +55,42 @@ let carouselStates = {}; // { postId: currentImageIndex }
 const EMOJI_OPTIONS = ['❤️', '😂', '😮', '😢', '🔥', '👏', '💜', '✨'];
 let expandedComments = {}; // { postId: true/false }
 
+// ========== TIMEZONE DETECTION & FORMATTING ==========
+function getUserTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch (error) {
+    console.warn('Could not detect timezone, defaulting to UTC');
+    return 'UTC';
+  }
+}
+
+function formatDateWithUserTimezone(date) {
+  const userTimezone = getUserTimezone();
+  return new Date(date).toLocaleString('en-US', {
+    timeZone: userTimezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: true
+  });
+}
+
+function formatDateShortWithUserTimezone(date) {
+  const userTimezone = getUserTimezone();
+  return new Date(date).toLocaleString('en-US', {
+    timeZone: userTimezone,
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+}
+
 // ========== AUTHENTICATION (localStorage-based) ==========
 async function handleLogin(e) {
   e.preventDefault();
@@ -415,27 +451,11 @@ function startAutoReload() {
 function createPostElement(post) {
   const isOwnPost = currentUserEmail === post.user_email;
   
-  // Format dates using browser's local timezone (user's system timezone)
-  const createdDate = new Date(post.created_at).toLocaleString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true
-  });
+  // Format dates using detected user timezone
+  const createdDate = formatDateWithUserTimezone(post.created_at);
   
   const isEdited = post.updated_at && new Date(post.updated_at) > new Date(post.created_at);
-  const updatedDate = new Date(post.updated_at).toLocaleString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true
-  });
+  const updatedDate = formatDateWithUserTimezone(post.updated_at);
 
   const postDiv = document.createElement('div');
   postDiv.id = `post-${post.id}`;
@@ -580,15 +600,7 @@ function createPostElement(post) {
   if (post.is_deleted && post.deleted_at) {
     const deletedDiv = document.createElement('div');
     deletedDiv.className = 'text-xs text-gray-400 italic border-t border-purple-500/30 pt-2 mt-2';
-    const deletedDate = new Date(post.deleted_at).toLocaleString('en-US', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true
-    });
+    const deletedDate = formatDateWithUserTimezone(post.deleted_at);
     deletedDiv.textContent = `🗑️ This post was deleted on ${deletedDate}`;
     postDiv.appendChild(deletedDiv);
   }
@@ -921,13 +933,7 @@ async function updateCommentsDisplay(postId, expand = false) {
           ` : ''}
         </div>
         <p class="text-purple-100">${comment.content}</p>
-        <span class="text-xs text-purple-400">${new Date(comment.created_at).toLocaleString('en-US', {
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: true
-        })}</span>
+        <span class="text-xs text-purple-400">${formatDateShortWithUserTimezone(comment.created_at)}</span>
       `;
       commentsContainer.appendChild(commentEl);
     });
