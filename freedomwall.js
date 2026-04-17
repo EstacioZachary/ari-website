@@ -639,17 +639,23 @@ function createPostElement(post) {
 function openImageModal(imageUrl) {
   const modal = document.createElement('div');
   modal.className = 'fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4';
-  modal.innerHTML = `
-    <div class="relative max-w-2xl w-full">
-      <img src="${imageUrl}" alt="Full view" class="w-full rounded-lg">
-      <button 
-        onclick="this.closest('.fixed').remove()"
-        class="absolute top-2 right-2 bg-black/50 hover:bg-black/70 w-8 h-8 rounded-full flex items-center justify-center text-white transition"
-      >
-        ✕
-      </button>
-    </div>
-  `;
+  
+  const container = document.createElement('div');
+  container.className = 'relative max-w-2xl w-full';
+  
+  const img = document.createElement('img');
+  img.src = imageUrl;
+  img.alt = 'Full view';
+  img.className = 'w-full rounded-lg';
+  container.appendChild(img);
+  
+  const closeBtn = document.createElement('button');
+  closeBtn.className = 'absolute top-2 right-2 bg-black/50 hover:bg-black/70 w-8 h-8 rounded-full flex items-center justify-center text-white transition';
+  closeBtn.innerHTML = '✕';
+  closeBtn.onclick = () => modal.remove();
+  container.appendChild(closeBtn);
+  
+  modal.appendChild(container);
   document.body.appendChild(modal);
   modal.addEventListener('click', (e) => {
     if (e.target === modal) modal.remove();
@@ -938,21 +944,36 @@ async function updateCommentsDisplay(postId, expand = false) {
     comments.forEach(comment => {
       const commentEl = document.createElement('div');
       commentEl.className = 'bg-black/40 border border-purple-500/30 rounded p-2 mb-2 text-sm';
-      commentEl.innerHTML = `
-        <div class="flex justify-between items-start mb-1">
-          <span class="font-semibold text-purple-200">${comment.username}</span>
-          ${comment.user_email === currentUserEmail ? `
-            <button 
-              onclick="deleteComment(${comment.id}, ${postId})"
-              class="text-xs text-red-400 hover:text-red-300 transition"
-            >
-              ✕
-            </button>
-          ` : ''}
-        </div>
-        <p class="text-purple-100">${comment.content}</p>
-        <span class="text-xs text-purple-400">${formatDateShortWithUserTimezone(comment.created_at)}</span>
-      `;
+      
+      // Header with username and delete button (safe)
+      const headerDiv = document.createElement('div');
+      headerDiv.className = 'flex justify-between items-start mb-1';
+      const usernameSpan = document.createElement('span');
+      usernameSpan.className = 'font-semibold text-purple-200';
+      usernameSpan.textContent = comment.username;
+      headerDiv.appendChild(usernameSpan);
+      
+      if (comment.user_email === currentUserEmail) {
+        const deleteBtn = document.createElement('button');
+        deleteBtn.onclick = () => deleteComment(comment.id, postId);
+        deleteBtn.className = 'text-xs text-red-400 hover:text-red-300 transition';
+        deleteBtn.textContent = '✕';
+        headerDiv.appendChild(deleteBtn);
+      }
+      commentEl.appendChild(headerDiv);
+      
+      // Comment content (safe - using textContent, not innerHTML)
+      const contentP = document.createElement('p');
+      contentP.className = 'text-purple-100';
+      contentP.textContent = comment.content;
+      commentEl.appendChild(contentP);
+      
+      // Timestamp (safe)
+      const timeSpan = document.createElement('span');
+      timeSpan.className = 'text-xs text-purple-400';
+      timeSpan.textContent = formatDateShortWithUserTimezone(comment.created_at);
+      commentEl.appendChild(timeSpan);
+      
       commentsContainer.appendChild(commentEl);
     });
 
