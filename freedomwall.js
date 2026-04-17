@@ -73,7 +73,12 @@ function getUserTimezone() {
 
 function formatDateWithUserTimezone(date) {
   const userTimezone = getUserTimezone();
-  const formatted = new Date(date).toLocaleString('en-US', {
+  // Ensure timestamp ends with Z (UTC indicator)
+  let dateString = String(date);
+  if (!dateString.endsWith('Z')) {
+    dateString += 'Z';
+  }
+  const formatted = new Date(dateString).toLocaleString('en-US', {
     timeZone: userTimezone,
     year: 'numeric',
     month: '2-digit',
@@ -83,13 +88,18 @@ function formatDateWithUserTimezone(date) {
     second: '2-digit',
     hour12: true
   });
-  console.log('📅 Date formatting:', { original: date, userTimezone, formatted });
+  console.log('📅 Date formatting:', { original: date, dateString, userTimezone, formatted });
   return formatted;
 }
 
 function formatDateShortWithUserTimezone(date) {
   const userTimezone = getUserTimezone();
-  return new Date(date).toLocaleString('en-US', {
+  // Ensure timestamp ends with Z (UTC indicator)
+  let dateString = String(date);
+  if (!dateString.endsWith('Z')) {
+    dateString += 'Z';
+  }
+  return new Date(dateString).toLocaleString('en-US', {
     timeZone: userTimezone,
     month: '2-digit',
     day: '2-digit',
